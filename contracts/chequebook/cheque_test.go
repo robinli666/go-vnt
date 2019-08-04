@@ -30,27 +30,35 @@ import (
 	"github.com/vntchain/go-vnt/contracts/chequebook/contract"
 	"github.com/vntchain/go-vnt/core"
 	"github.com/vntchain/go-vnt/crypto"
+	"github.com/vntchain/go-vnt/params"
 )
 
 var (
-	key0, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
-	key1, _ = crypto.HexToECDSA("8a1f9a8f95be41cd7ccb6168179afb4504aefe388d1e14474d32c45c72ce7b7a")
-	key2, _ = crypto.HexToECDSA("49a7b37aa6f6645917e7b807e9d1c00d4fa71f18343b0d4122a4d2df64dd6fee")
-	addr0   = crypto.PubkeyToAddress(key0.PublicKey)
-	addr1   = crypto.PubkeyToAddress(key1.PublicKey)
-	addr2   = crypto.PubkeyToAddress(key2.PublicKey)
+	chainID      = params.TestChainConfig.ChainID
+	key0, _      = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
+	key1, _      = crypto.HexToECDSA("8a1f9a8f95be41cd7ccb6168179afb4504aefe388d1e14474d32c45c72ce7b7a")
+	key2, _      = crypto.HexToECDSA("49a7b37aa6f6645917e7b807e9d1c00d4fa71f18343b0d4122a4d2df64dd6fee")
+	addr0        = crypto.PubkeyToAddress(key0.PublicKey)
+	addr1        = crypto.PubkeyToAddress(key1.PublicKey)
+	addr2        = crypto.PubkeyToAddress(key2.PublicKey)
+	activeKey, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f292")
+	activeAddr   = crypto.PubkeyToAddress(activeKey.PublicKey)
 )
 
 func newTestBackend() *backends.SimulatedBackend {
-	return backends.NewSimulatedBackend(core.GenesisAlloc{
-		addr0: {Balance: big.NewInt(1000000000)},
-		addr1: {Balance: big.NewInt(1000000000)},
-		addr2: {Balance: big.NewInt(1000000000)},
+
+	backend := backends.NewSimulatedBackend(core.GenesisAlloc{
+		addr0:      {Balance: big.NewInt(1000000000)},
+		addr1:      {Balance: big.NewInt(1000000000)},
+		addr2:      {Balance: big.NewInt(1000000000)},
+		activeAddr: {Balance: big.NewInt(0).Mul(big.NewInt(1e9), big.NewInt(1e18))},
 	})
+
+	return backend
 }
 
 func deploy(prvKey *ecdsa.PrivateKey, amount *big.Int, backend *backends.SimulatedBackend) (common.Address, error) {
-	deployTransactor := bind.NewKeyedTransactor(prvKey)
+	deployTransactor := bind.NewKeyedTransactor(prvKey, chainID)
 	deployTransactor.Value = amount
 	addr, _, _, err := contract.DeployChequebook(deployTransactor, backend)
 	if err != nil {
@@ -67,13 +75,12 @@ func TestIssueAndReceive(t *testing.T) {
 	if err != nil {
 		t.Fatalf("deploy contract: expected no error, got %v", err)
 	}
-	chbook, err := NewChequebook(path, addr0, key0, backend)
+	chbook, err := NewChequebook(chainID, path, addr0, key0, backend)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 	chbook.sent[addr1] = new(big.Int).SetUint64(42)
 	amount := common.Big1
-
 	if _, err = chbook.Issue(addr1, amount); err == nil {
 		t.Fatalf("expected insufficient funds error, got none")
 	}
@@ -92,7 +99,7 @@ func TestIssueAndReceive(t *testing.T) {
 		t.Errorf("expected: %v, got %v", "0", chbook.Balance())
 	}
 
-	chbox, err := NewInbox(key1, addr0, addr1, &key0.PublicKey, backend)
+	chbox, err := NewInbox(chainID, key1, addr0, addr1, &key0.PublicKey, backend)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -111,7 +118,7 @@ func TestIssueAndReceive(t *testing.T) {
 func TestCheckbookFile(t *testing.T) {
 	path := filepath.Join(os.TempDir(), "chequebook-test.json")
 	backend := newTestBackend()
-	chbook, err := NewChequebook(path, addr0, key0, backend)
+	chbook, err := NewChequebook(chainID, path, addr0, key0, backend)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -120,7 +127,7 @@ func TestCheckbookFile(t *testing.T) {
 
 	chbook.Save()
 
-	chbook, err = LoadChequebook(path, key0, backend, false)
+	chbook, err = LoadChequebook(chainID, path, key0, backend, false)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -149,18 +156,16 @@ func TestVerifyErrors(t *testing.T) {
 	if err != nil {
 		t.Errorf("expected no error, got %v", err)
 	}
-	chbook0, err := NewChequebook(path0, contr0, key0, backend)
+	chbook0, err := NewChequebook(chainID, path0, contr0, key0, backend)
 	if err != nil {
 		t.Errorf("expected no error, got %v", err)
 	}
-
 	path1 := filepath.Join(os.TempDir(), "chequebook-test-1.json")
 	contr1, _ := deploy(key1, common.Big2, backend)
-	chbook1, err := NewChequebook(path1, contr1, key1, backend)
+	chbook1, err := NewChequebook(chainID, path1, contr1, key1, backend)
 	if err != nil {
 		t.Errorf("expected no error, got %v", err)
 	}
-
 	chbook0.sent[addr1] = new(big.Int).SetUint64(42)
 	chbook0.balance = new(big.Int).Set(common.Big2)
 	chbook1.balance = new(big.Int).Set(common.Big1)
@@ -169,17 +174,14 @@ func TestVerifyErrors(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-
-	chbox, err := NewInbox(key1, contr0, addr1, &key0.PublicKey, backend)
+	chbox, err := NewInbox(chainID, key1, contr0, addr1, &key0.PublicKey, backend)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-
 	received, err := chbox.Receive(ch0)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-
 	if received.Cmp(big.NewInt(43)) != 0 {
 		t.Errorf("expected: %v, got %v", "43", received)
 	}
@@ -188,7 +190,6 @@ func TestVerifyErrors(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-
 	received, err = chbox.Receive(ch1)
 	t.Logf("correct error: %v", err)
 	if err == nil {
@@ -224,7 +225,7 @@ func TestDeposit(t *testing.T) {
 	backend := newTestBackend()
 	contr0, _ := deploy(key0, new(big.Int), backend)
 
-	chbook, err := NewChequebook(path0, contr0, key0, backend)
+	chbook, err := NewChequebook(chainID, path0, contr0, key0, backend)
 	if err != nil {
 		t.Errorf("expected no error, got %v", err)
 	}
@@ -363,7 +364,7 @@ func TestCash(t *testing.T) {
 	backend := newTestBackend()
 	contr0, _ := deploy(key0, common.Big2, backend)
 
-	chbook, err := NewChequebook(path, contr0, key0, backend)
+	chbook, err := NewChequebook(chainID, path, contr0, key0, backend)
 	if err != nil {
 		t.Errorf("expected no error, got %v", err)
 	}
@@ -375,7 +376,7 @@ func TestCash(t *testing.T) {
 		t.Fatalf("expected no error, got %v", err)
 	}
 	backend.Commit()
-	chbox, err := NewInbox(key1, contr0, addr1, &key0.PublicKey, backend)
+	chbox, err := NewInbox(chainID, key1, contr0, addr1, &key0.PublicKey, backend)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}

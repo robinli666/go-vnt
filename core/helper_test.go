@@ -20,11 +20,11 @@ import (
 	"container/list"
 
 	"github.com/vntchain/go-vnt/core/types"
-	"github.com/vntchain/go-vnt/vntdb"
 	"github.com/vntchain/go-vnt/event"
+	"github.com/vntchain/go-vnt/vntdb"
 )
 
-// Implement our EthTest Manager
+// Implement our VntTest Manager
 type TestManager struct {
 	// stateManager *StateManager
 	eventMux *event.TypeMux
@@ -39,7 +39,7 @@ func (tm *TestManager) IsListening() bool {
 	return false
 }
 
-func (tm *TestManager) IsMining() bool {
+func (tm *TestManager) IsProducing() bool {
 	return false
 }
 

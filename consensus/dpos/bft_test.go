@@ -1,11 +1,28 @@
+// Copyright 2019 The go-vnt Authors
+// This file is part of the go-vnt library.
+//
+// The go-vnt library is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// The go-vnt library is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU Lesser General Public License for more details.
+//
+// You should have received a copy of the GNU Lesser General Public License
+// along with the go-vnt library. If not, see <http://www.gnu.org/licenses/>.
+
 package dpos
 
 import (
+	"math/big"
+	"testing"
+
 	"github.com/vntchain/go-vnt/common"
 	"github.com/vntchain/go-vnt/core/types"
 	"github.com/vntchain/go-vnt/params"
-	"math/big"
-	"testing"
 )
 
 func newDefaultBft() *BftManager {
@@ -24,7 +41,7 @@ func TestHandleBftMsg_FutureMsg(t *testing.T) {
 	// set state
 	bft.h = big.NewInt(10)
 	bft.r = 0
-	bft.mining = 1
+	bft.producing = 1
 
 	tests := []struct {
 		h int64
@@ -66,7 +83,7 @@ func TestHandleBftMsg_OutdatedMsg(t *testing.T) {
 	// set state
 	bft.h = big.NewInt(10)
 	bft.r = 1
-	bft.mining = 1
+	bft.producing = 1
 
 	tests := []struct {
 		h int64
@@ -100,13 +117,13 @@ func TestHandleBftMsg_OutdatedMsg(t *testing.T) {
 	}
 }
 
-func TestHandleBftMsg_NoMining(t *testing.T) {
+func TestHandleBftMsg_NoProducing(t *testing.T) {
 	bft := newDefaultBft()
 
 	// set state
 	bft.h = big.NewInt(10)
 	bft.r = 1
-	bft.mining = 0
+	bft.producing = 0
 
 	// Create msg
 	h1 := big.NewInt(10)

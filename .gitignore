@@ -10,7 +10,6 @@
 *un~
 .DS_Store
 */**/.DS_Store
-.ethtest
 */**/*tx_database*
 */**/*dapps*
 build/_vendor/pkg
@@ -47,3 +46,5 @@ profile.cov
 **/yarn-error.log
 
 /tests/testcode/ldb/dump/*
+
+nohup.out

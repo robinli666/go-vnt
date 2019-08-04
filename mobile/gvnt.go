@@ -50,7 +50,7 @@ type NodeConfig struct {
 	// set to zero, then only the configured static and trusted peers can connect.
 	MaxPeers int
 
-	// EthereumEnabled specifies whether the node should run the VNT protocol.
+	// VntEnabled specifies whether the node should run the VNT protocol.
 	VntEnabled bool
 
 	// HubbleNetworkID is the network identifier used by the VNT protocol to
@@ -146,25 +146,18 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 		if err := json.Unmarshal([]byte(config.HubbleGenesis), genesis); err != nil {
 			return nil, fmt.Errorf("invalid genesis spec: %v", err)
 		}
-		// If we have the testnet, hard code the chain configs too
-		if config.HubbleGenesis == TestnetGenesis() {
-			genesis.Config = params.TestnetChainConfig
-			if config.HubbleNetworkID == 1 {
-				config.HubbleNetworkID = 3
-			}
-		}
 	}
 	// Register the VNT protocol if requested
 	if config.VntEnabled {
-		ethConf := vnt.DefaultConfig
-		ethConf.Genesis = genesis
-		ethConf.SyncMode = downloader.LightSync
-		ethConf.NetworkId = uint64(config.HubbleNetworkID)
-		ethConf.DatabaseCache = config.HubbleDatabaseCache
+		vntConf := vnt.DefaultConfig
+		vntConf.Genesis = genesis
+		vntConf.SyncMode = downloader.LightSync
+		vntConf.NetworkId = uint64(config.HubbleNetworkID)
+		vntConf.DatabaseCache = config.HubbleDatabaseCache
 		if err := rawStack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
-			return les.New(ctx, &ethConf)
+			return les.New(ctx, &vntConf)
 		}); err != nil {
-			return nil, fmt.Errorf("ethereum init: %v", err)
+			return nil, fmt.Errorf("gvnt init: %v", err)
 		}
 		// If netstats reporting is requested, do it
 		if config.HubbleNetStats != "" {
@@ -200,7 +193,7 @@ func (n *Node) Stop() error {
 	return n.node.Stop()
 }
 
-// GetEthereumClient retrieves a client to access the VNT subsystem.
+// GetVNTClient retrieves a client to access the VNT subsystem.
 func (n *Node) GetVNTClient() (client *VNTClient, _ error) {
 	rpc, err := n.node.Attach()
 	if err != nil {

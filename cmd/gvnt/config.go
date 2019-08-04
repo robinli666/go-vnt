@@ -69,7 +69,7 @@ var tomlSettings = toml.Config{
 	},
 }
 
-type ethstatsConfig struct {
+type vntstatsConfig struct {
 	URL string `toml:",omitempty"`
 }
 
@@ -77,7 +77,7 @@ type gvntConfig struct {
 	Vnt      vnt.Config
 	Shh      whisper.Config
 	Node     node.Config
-	Ethstats ethstatsConfig
+	Vntstats vntstatsConfig
 }
 
 func loadConfig(file string, cfg *gvntConfig) error {
@@ -126,9 +126,9 @@ func makeConfigNode(ctx *cli.Context) (*node.Node, gvntConfig) {
 	if err != nil {
 		utils.Fatalf("Failed to create the protocol stack: %v", err)
 	}
-	utils.SetEthConfig(ctx, stack, &cfg.Vnt)
-	if ctx.GlobalIsSet(utils.EthStatsURLFlag.Name) {
-		cfg.Ethstats.URL = ctx.GlobalString(utils.EthStatsURLFlag.Name)
+	utils.SetVntConfig(ctx, stack, &cfg.Vnt)
+	if ctx.GlobalIsSet(utils.VntStatsURLFlag.Name) {
+		cfg.Vntstats.URL = ctx.GlobalString(utils.VntStatsURLFlag.Name)
 	}
 
 	utils.SetShhConfig(ctx, stack, &cfg.Shh)
@@ -149,11 +149,11 @@ func enableWhisper(ctx *cli.Context) bool {
 func makeFullNode(ctx *cli.Context) *node.Node {
 	stack, cfg := makeConfigNode(ctx)
 
-	utils.RegisterEthService(stack, &cfg.Vnt)
+	utils.RegisterVntService(stack, &cfg.Vnt)
 
 	// Whisper must be explicitly enabled by specifying at least 1 whisper flag or in dev mode
 	shhEnabled := enableWhisper(ctx)
-	shhAutoEnabled := !ctx.GlobalIsSet(utils.WhisperEnabledFlag.Name) && ctx.GlobalIsSet(utils.DeveloperFlag.Name)
+	shhAutoEnabled := !ctx.GlobalIsSet(utils.WhisperEnabledFlag.Name)
 	if shhEnabled || shhAutoEnabled {
 		if ctx.GlobalIsSet(utils.WhisperMaxMessageSizeFlag.Name) {
 			cfg.Shh.MaxMessageSize = uint32(ctx.Int(utils.WhisperMaxMessageSizeFlag.Name))
@@ -165,8 +165,8 @@ func makeFullNode(ctx *cli.Context) *node.Node {
 	}
 
 	// Add the VNT Stats daemon if requested.
-	if cfg.Ethstats.URL != "" {
-		utils.RegisterEthStatsService(stack, cfg.Ethstats.URL)
+	if cfg.Vntstats.URL != "" {
+		utils.RegisterVntStatsService(stack, cfg.Vntstats.URL)
 	}
 	return stack
 }

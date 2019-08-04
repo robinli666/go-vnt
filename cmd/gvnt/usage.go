@@ -62,7 +62,7 @@ type flagGroup struct {
 
 // AppHelpFlagGroups is the application flags, grouped by functionality.
 var AppHelpFlagGroups = []flagGroup{
-	{ // yhx
+	{
 		Name: "TEMP",
 		Flags: []cli.Flag{
 			utils.FindNodeFlag,
@@ -70,28 +70,19 @@ var AppHelpFlagGroups = []flagGroup{
 		},
 	},
 	{
-		Name: "ETHEREUM",
+		Name: "HUBBLE NETWORK",
 		Flags: []cli.Flag{
 			configFileFlag,
 			utils.DataDirFlag,
 			utils.KeyStoreDirFlag,
-			utils.NoUSBFlag,
 			utils.NetworkIdFlag,
-			utils.TestnetFlag,
-			utils.RinkebyFlag,
 			utils.SyncModeFlag,
 			utils.GCModeFlag,
-			utils.EthStatsURLFlag,
+			utils.VntStatsURLFlag,
 			utils.IdentityFlag,
 			utils.LightServFlag,
 			utils.LightPeersFlag,
 			utils.LightKDFFlag,
-		},
-	},
-	{Name: "DEVELOPER CHAIN",
-		Flags: []cli.Flag{
-			utils.DeveloperFlag,
-			utils.DeveloperPeriodFlag,
 		},
 	},
 	{
@@ -164,11 +155,10 @@ var AppHelpFlagGroups = []flagGroup{
 		},
 	},
 	{
-		Name: "MINER",
+		Name: "BLOCK PRODUCE",
 		Flags: []cli.Flag{
-			utils.MiningEnabledFlag,
-			utils.MinerThreadsFlag,
-			utils.EtherbaseFlag,
+			utils.ProducingEnabledFlag,
+			utils.CoinbaseFlag,
 			utils.TargetGasLimitFlag,
 			utils.GasPriceFlag,
 			utils.ExtraDataFlag,
@@ -197,13 +187,6 @@ var AppHelpFlagGroups = []flagGroup{
 	{
 		Name:  "WHISPER (EXPERIMENTAL)",
 		Flags: whisperFlags,
-	},
-	{
-		Name: "DEPRECATED",
-		Flags: []cli.Flag{
-			utils.FastSyncFlag,
-			utils.LightModeFlag,
-		},
 	},
 	{
 		Name: "MISC",

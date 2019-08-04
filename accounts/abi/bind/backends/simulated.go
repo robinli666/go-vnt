@@ -24,11 +24,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/vntchain/go-vnt"
+	hubble "github.com/vntchain/go-vnt"
 	"github.com/vntchain/go-vnt/accounts/abi/bind"
 	"github.com/vntchain/go-vnt/common"
 	"github.com/vntchain/go-vnt/common/math"
-	"github.com/vntchain/go-vnt/consensus/dpos"
+	"github.com/vntchain/go-vnt/consensus/mock"
 	"github.com/vntchain/go-vnt/core"
 	"github.com/vntchain/go-vnt/core/bloombits"
 	"github.com/vntchain/go-vnt/core/rawdb"
@@ -67,9 +67,9 @@ type SimulatedBackend struct {
 // for testing purposes.
 func NewSimulatedBackend(alloc core.GenesisAlloc) *SimulatedBackend {
 	database := vntdb.NewMemDatabase()
-	genesis := core.Genesis{Config: params.TestChainConfig, Alloc: alloc}
+	genesis := core.Genesis{Config: params.TestChainConfig, Alloc: alloc, Timestamp: 1546272000 + 10000}
 	genesis.MustCommit(database)
-	blockchain, _ := core.NewBlockChain(database, nil, genesis.Config, dpos.NewFaker(), vm.Config{})
+	blockchain, _ := core.NewBlockChain(database, nil, genesis.Config, mock.NewMock(), vm.Config{})
 
 	backend := &SimulatedBackend{
 		database:   database,
@@ -102,7 +102,7 @@ func (b *SimulatedBackend) Rollback() {
 }
 
 func (b *SimulatedBackend) rollback() {
-	blocks, _ := core.GenerateChain(b.config, b.blockchain.CurrentBlock(), dpos.NewFaker(), b.database, 1, func(int, *core.BlockGen) {})
+	blocks, _ := core.GenerateChain(b.config, b.blockchain.CurrentBlock(), mock.NewMock(), b.database, 1, func(int, *core.BlockGen) {})
 	statedb, _ := b.blockchain.State()
 
 	b.pendingBlock = blocks[0]
@@ -208,7 +208,7 @@ func (b *SimulatedBackend) PendingNonceAt(ctx context.Context, account common.Ad
 }
 
 // SuggestGasPrice implements ContractTransactor.SuggestGasPrice. Since the simulated
-// chain doens't have miners, we just return a gas price of 1 for any call.
+// chain doens't have producers, we just return a gas price of 1 for any call.
 func (b *SimulatedBackend) SuggestGasPrice(ctx context.Context) (*big.Int, error) {
 	return big.NewInt(1), nil
 }
@@ -282,11 +282,10 @@ func (b *SimulatedBackend) callContract(ctx context.Context, call hubble.CallMsg
 	// Execute the call.
 	msg := callmsg{call}
 
-	evmContext := core.NewVMContext(msg, block.Header(), b.blockchain, nil)
+	vmContext := core.NewVMContext(msg, block.Header(), b.blockchain, nil)
 	// Create a new environment which holds all relevant information
 	// about the transaction and calling mechanisms.
-	//vmenv := vm.NewEVM(evmContext, statedb, b.config, vm.Config{})
-	vmenv := core.GetVM(msg, evmContext, stateObj, b.config, vm.Config{})
+	vmenv := core.GetVM(msg, vmContext, stateObj, b.config, vm.Config{})
 	gaspool := new(core.GasPool).AddGas(math.MaxUint64)
 
 	return core.NewStateTransition(vmenv, msg, gaspool).TransitionDb()
@@ -297,8 +296,8 @@ func (b *SimulatedBackend) callContract(ctx context.Context, call hubble.CallMsg
 func (b *SimulatedBackend) SendTransaction(ctx context.Context, tx *types.Transaction) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-
-	sender, err := types.Sender(types.HomesteadSigner{}, tx)
+	signer := types.NewHubbleSigner(b.config.ChainID)
+	sender, err := types.Sender(signer, tx)
 	if err != nil {
 		panic(fmt.Errorf("invalid transaction: %v", err))
 	}
@@ -307,7 +306,7 @@ func (b *SimulatedBackend) SendTransaction(ctx context.Context, tx *types.Transa
 		panic(fmt.Errorf("invalid transaction nonce: got %d, want %d", tx.Nonce(), nonce))
 	}
 
-	blocks, _ := core.GenerateChain(b.config, b.blockchain.CurrentBlock(), dpos.NewFaker(), b.database, 1, func(number int, block *core.BlockGen) {
+	blocks, _ := core.GenerateChain(b.config, b.blockchain.CurrentBlock(), mock.NewMock(), b.database, 1, func(number int, block *core.BlockGen) {
 		for _, tx := range b.pendingBlock.Transactions() {
 			block.AddTxWithChain(b.blockchain, tx)
 		}
@@ -386,7 +385,7 @@ func (b *SimulatedBackend) SubscribeFilterLogs(ctx context.Context, query hubble
 func (b *SimulatedBackend) AdjustTime(adjustment time.Duration) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	blocks, _ := core.GenerateChain(b.config, b.blockchain.CurrentBlock(), dpos.NewFaker(), b.database, 1, func(number int, block *core.BlockGen) {
+	blocks, _ := core.GenerateChain(b.config, b.blockchain.CurrentBlock(), mock.NewMock(), b.database, 1, func(number int, block *core.BlockGen) {
 		for _, tx := range b.pendingBlock.Transactions() {
 			block.AddTx(tx)
 		}

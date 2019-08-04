@@ -1,18 +1,37 @@
+// Copyright 2019 The go-vnt Authors
+// This file is part of the go-vnt library.
+//
+// The go-vnt library is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// The go-vnt library is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU Lesser General Public License for more details.
+//
+// You should have received a copy of the GNU Lesser General Public License
+// along with the go-vnt library. If not, see <http://www.gnu.org/licenses/>.
+
 package election
 
 import (
 	"bytes"
 	"fmt"
 	"math/big"
+	"reflect"
+	"strconv"
 	"testing"
 
+	"github.com/magiconair/properties/assert"
 	"github.com/vntchain/go-vnt/common"
 	"github.com/vntchain/go-vnt/core/state"
 	inter "github.com/vntchain/go-vnt/core/vm/interface"
 	"github.com/vntchain/go-vnt/vntdb"
 )
 
-var url = []byte("vnode://db881fae20f9339176beb89e8bc965d72e817c2994840033746a68ab5cc5260958192467aba695ec3747092ff3c56d09bab8061276f2c3c54ba992bdf8ceafd0@[::]:31303")
+var url = []byte("/ip4/127.0.0.1/tcp/30303/ipfs/1kHGq5zZFRW5FBJ9YMbbvSiW4AzGg5CKMCtDeg6FNnjCbGS")
 
 var InputCase = [][]byte{
 	common.FromHex("c94ba774"),
@@ -24,20 +43,45 @@ var InputCase = [][]byte{
 	common.FromHex("97107d6d000000000000000000000000a863d8efa01ece6fabfa7e8c85217a3c1af833a9"),
 	common.FromHex("a694fc3a0000000000000000000000000000000000000000000000000000000000000064"),
 	common.FromHex("73cf575a"),
-	common.FromHex("efff125b00000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000093656e6f64653a2f2f6266613730663133313962343063333139663961373930306266623836303563616531643631366636653131306264363431383533393763313664613635386562313039383061343566366663303335646135656364623435393330303835313130393663623034643031666636643434616335313230306239623930336661405b3a3a5d3a333033303300000000000000000000000000"),
+	common.FromHex("65f7314e000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000e00000000000000000000000000000000000000000000000000000000000000140000000000000000000000000000000000000000000000000000000000000004d2f6970342f3132372e302e302e312f7463702f33303330332f697066732f316b484771357a5a4652573546424a39594d62627653695734417a476735434b4d437444656736464e6e6a436247530000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000317777772e746573746e65742e696e666f2e776562736974652e746573742e746573742e746573742e746573742e74657374000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000874657374696e666f000000000000000000000000000000000000000000000000"),
 	common.FromHex("f67ab93e"),
 }
-var candidates = []common.Address{
-	common.BytesToAddress([]byte{1}),
-	common.BytesToAddress([]byte{2}),
-	common.BytesToAddress([]byte{3}),
-	common.BytesToAddress([]byte{4}),
-	common.BytesToAddress([]byte{5}),
-	common.BytesToAddress([]byte{6}),
-	common.BytesToAddress([]byte{7}),
-	common.BytesToAddress([]byte{8}),
-	common.BytesToAddress([]byte{9}),
+
+type candiRegInfo struct {
+	addr    common.Address
+	name    []byte
+	website []byte
+	url     []byte
 }
+
+var (
+	addr1 = common.HexToAddress("41b0db166cfdf1c4ba3ce657171482a9aa55cc93")
+	addr2 = common.HexToAddress("08b467a881ec34b668254aa956e0c46f9c3b2b83")
+	addr3 = common.HexToAddress("0c0292587ccdc76b8f449002a017bc9479ff0a88")
+	addr4 = common.HexToAddress("0a0292587ccdc76b8f449002a017bc9479ff0a88")
+	addr5 = common.HexToAddress("0b0292587ccdc76b8f449002a017bc9479ff0a88")
+	addr6 = common.HexToAddress("0d0292587ccdc76b8f449002a017bc9479ff0a88")
+	addr7 = common.HexToAddress("0e0292587ccdc76b8f449002a017bc9479ff0a88")
+	addr8 = common.HexToAddress("0e0292587ccdc76b8f449002a017bc9479ff0a81")
+	addr9 = common.HexToAddress("0e0292587ccdc76b8f449002a017bc9479ff0a82")
+
+	candiInfo1 = candiRegInfo{addr1, []byte("node1"), []byte("www.node1.com"), []byte("/ip4/127.0.0.1/tcp/30303/ipfs/1kHNAAfnqXNsxMwJf6QjJFRmVK7iB32U9owwK9KfeLFxEA7")}
+	candiInfo2 = candiRegInfo{addr2, []byte("node2"), []byte("www.node2.com"), []byte("/ip4/127.0.0.1/tcp/30303/ipfs/1kHcch6yuBCgC5nPPSK3Yp7Es4c4eenxAeK167pYwUvNjRo")}
+	candiInfo3 = candiRegInfo{addr3, []byte("node3"), []byte("www.node3.com"), []byte("/ip4/127.0.0.1/tcp/30303/ipfs/1kHJFKr2bzUnMr1NbeyYbYJa3RXT18cEu7cNDrHWjg8XYKB")}
+	candiInfo4 = candiRegInfo{addr4, []byte("node4"), []byte("www.node4.com"), []byte("/ip4/127.0.0.1/tcp/30303/ipfs/1kHfop9dnUHHmtBXVkLB5UauAmACtrsEX5H5t6oCRpdL198")}
+	candiInfo5 = candiRegInfo{addr5, []byte("node5"), []byte("www.node5.com"), []byte("/ip4/127.0.0.1/tcp/30303/ipfs/1kHGG8L1DTrVG3Cad479Q32oGmFAiEjLFwxzNyXH3ehGo73")}
+	candiInfo6 = candiRegInfo{addr6, []byte("node6"), []byte("www.node6.com"), []byte("/ip4/127.0.0.1/tcp/30303/ipfs/1kHmExX4yutwBZLbRsYHq59KfgiM1LUJFW2JSPeSCcBf7rH")}
+	candiInfo7 = candiRegInfo{addr7, []byte("nodd7"), []byte("www.node7.com"), []byte("/ip4/127.0.0.1/tcp/30303/ipfs/1kHSMhv82q5thJkdeJzxCVW8tdXwaDThBZWsH2Q9KUGGFUq")}
+	candiInfo8 = candiRegInfo{addr8, []byte("nodd8"), []byte("www.node8.com"), []byte("/ip4/127.0.0.1/tcp/30303/ipfs/1kHYwV52itn31V5fRXzERMygHFDx6PrSFS8puEr3N4Ujv69")}
+	candiInfo9 = candiRegInfo{addr9, []byte("nodd9"), []byte("www.node9.com"), []byte("/ip4/127.0.0.1/tcp/30303/ipfs/1kHiEQS9qnK1YJN25eNyTjDRUukTzComAMWYAowTAYCu1K4")}
+
+	candidates = []common.Address{addr1, addr2, addr3, addr4, addr5, addr6, addr7, addr8, addr9}
+	candiInfos = []candiRegInfo{candiInfo1, candiInfo2, candiInfo3, candiInfo4, candiInfo5, candiInfo6, candiInfo7, candiInfo8, candiInfo9}
+
+	// 	绑定人信息
+	binder      = common.HexToAddress("923839919383938289")
+	beneficiary = common.HexToAddress("923839919383938281")
+)
 
 type testContext struct {
 	Origin  common.Address
@@ -72,12 +116,13 @@ func newcontext() inter.ChainContext {
 	return &c
 }
 
-func getAllVoter(db inter.StateDB) []*Voter {
+func getAllVoter(t *testing.T, db inter.StateDB) []*Voter {
 	var result []*Voter
 	voters := make(map[common.Hash]common.Hash)
 	addrs := make(map[common.Address]struct{})
 
-	db.ForEachStorage(electionAddr, func(key common.Hash, value common.Hash) bool {
+	// 根据voter前缀，在db中获取所有的voter地址
+	db.ForEachStorage(contractAddr, func(key common.Hash, value common.Hash) bool {
 		if key[0] == VOTERPREFIX {
 			voters[key] = value
 
@@ -92,22 +137,27 @@ func getAllVoter(db inter.StateDB) []*Voter {
 		return voters[key]
 	}
 
+	// 根据已获得的voter地址获取所有的voter结构体
 	for addr := range addrs {
 		var voter Voter
-		convertToStruct(VOTERPREFIX, addr, &voter, getFn)
+		if err := convertToStruct(VOTERPREFIX, addr, &voter, getFn); err != nil {
+			t.Errorf("addr: %s, error: %s", addr.String(), err)
+		}
 		result = append(result, &voter)
 
 	}
 	return result
 }
 
-func checkValid(c electionContext) (bool, error) {
+// 计算所有投出的票数，跟候选人所拥有的票数是否想相等
+func checkValid(t *testing.T, c electionContext) (bool, error) {
 	// 保存原先context的时间
 	currentTime := c.context.GetTime()
 
 	proxyVote := make(map[common.Address]*big.Int)
+	// 从所有voter搜集总票数
 	voteCount := make(map[common.Address]*big.Int)
-	voters := getAllVoter(c.context.GetStateDb())
+	voters := getAllVoter(t, c.context.GetStateDb())
 	// 循环一遍voter，做一遍初步的检查
 	for _, voter := range voters {
 		// 如果proxy不为空
@@ -175,13 +225,14 @@ func checkValid(c electionContext) (bool, error) {
 		}
 	}
 
+	// 检查候选人收到的票数，与所有人投的是否相等
 	candidates := getAllCandidate(c.context.GetStateDb())
 	for _, candidate := range candidates {
 		if voteCount[candidate.Owner] == nil {
 			voteCount[candidate.Owner] = big.NewInt(0)
 		}
 		if candidate.VoteCount == nil || candidate.VoteCount.Cmp(voteCount[candidate.Owner]) != 0 {
-			return false, fmt.Errorf("voteCount is wrong. candidate address: %x,voteCount in db: %d, expect voteCount : %d", candidate.Owner, candidate.VoteCount, voteCount[candidate.Owner])
+			return false, fmt.Errorf("voteCount is wrong. candidate address: %x, voteCount in db: %d, expect voteCount : %d", candidate.Owner, candidate.VoteCount, voteCount[candidate.Owner])
 		}
 	}
 
@@ -193,7 +244,7 @@ func TestInput(t *testing.T) {
 	context := newcontext()
 
 	for _, input := range InputCase {
-		_, err := e.Run(context, input)
+		_, err := e.Run(context, input, big.NewInt(0))
 		if err != nil && err == fmt.Errorf("call election contract err: method doesn't exist") {
 			t.Error(err)
 		}
@@ -203,16 +254,17 @@ func TestInput(t *testing.T) {
 func TestCandidate_votes(t *testing.T) {
 	var addr1 common.Address
 	c1 := &Candidate{
-		Owner:     addr1,
-		VoteCount: big.NewInt(10),
-		Active:    true,
+		Owner:      addr1,
+		VoteCount:  big.NewInt(10),
+		Registered: true,
+		Bind:       true,
 	}
 
 	if c1.votes().Cmp(big.NewInt(10)) != 0 {
 		t.Errorf("votes() error. want = %v, got = %s", 10, c1.votes().String())
 	}
 
-	c1.Active = false
+	c1.Registered = false
 	if c1.votes().Cmp(big.NewInt(-10)) != 0 {
 		t.Errorf("votes() error. want = %v, got = %s", -10, c1.votes().String())
 	}
@@ -221,23 +273,15 @@ func TestCandidate_votes(t *testing.T) {
 func TestCandidate_equal(t *testing.T) {
 	addr1 := common.HexToAddress("0x122369f04f32269598789998de33e3d56e2c507a")
 	addr2 := common.HexToAddress("0x42a875ac43f2b4e6d17f54d288071f5952bf8911")
-	c1 := Candidate{
-		Owner:     addr1,
-		VoteCount: big.NewInt(10),
-		Active:    true,
-	}
-	c2 := Candidate{
-		Owner:     addr2,
-		VoteCount: big.NewInt(20),
-		Active:    false,
-	}
+	c1 := Candidate{Owner: addr1, VoteCount: big.NewInt(10), Registered: true}
+	c2 := Candidate{Owner: addr2, VoteCount: big.NewInt(20), Registered: false}
 
 	if c1.equal(&c2) {
 		t.Errorf("two Candidate should not equal")
 	}
 
 	c1.Owner = addr2
-	c1.Active = false
+	c1.Registered = false
 	c1.VoteCount = big.NewInt(20)
 
 	if c1.equal(&c2) == false {
@@ -246,53 +290,59 @@ func TestCandidate_equal(t *testing.T) {
 }
 
 func TestCandidateList_Less(t *testing.T) {
-	addr1 := common.HexToAddress("0x122369f04f32269598789998de33e3d56e2c507a")
+	addr1 := common.HexToAddress("0x522369f04f32269598789998de33e3d56e2c507a")
 	addr2 := common.HexToAddress("0x42a875ac43f2b4e6d17f54d288071f5952bf8911")
-	c1 := Candidate{
-		Owner:     addr1,
-		VoteCount: big.NewInt(10),
-		Active:    true,
-	}
-	c2 := Candidate{
-		Owner:     addr2,
-		VoteCount: big.NewInt(20),
-		Active:    false,
-	}
+	addr3 := common.HexToAddress("0x18a875ac43f2b4e6d17f54d288071f5952bf8911")
+	c1 := Candidate{Owner: addr1, VoteCount: big.NewInt(10), Registered: true}
+	c2 := Candidate{Owner: addr2, VoteCount: big.NewInt(20), Registered: false}
+	c3 := Candidate{Owner: addr3, VoteCount: big.NewInt(10), Registered: true}
 
-	var cl CandidateList
-	cl = append(cl, c1)
-	cl = append(cl, c2)
+	cl := CandidateList{c1, c2, c3}
 
-	// actual is greater
 	if cl.Less(0, 1) == false {
-		t.Errorf("cl[0] should greater than cl[1]: %s, %s", cl[0].votes().String(), cl[1].votes().String())
+		t.Errorf("c1 should greater than c2, c1= %s, c2=%s", c1.String(), c2.String())
+	}
+	if cl.Less(0, 2) == true {
+		t.Errorf("c1 should less than c3, c1= %s, c3=%s", c1.String(), c3.String())
 	}
 }
 
 func TestCandidateList_Swap(t *testing.T) {
-	addr1 := common.HexToAddress("0x122369f04f32269598789998de33e3d56e2c507a")
-	addr2 := common.HexToAddress("0x42a875ac43f2b4e6d17f54d288071f5952bf8911")
-	c1 := Candidate{
-		Owner:     addr1,
-		VoteCount: big.NewInt(10),
-		Active:    true,
-	}
-	c2 := Candidate{
-		Owner:     addr2,
-		VoteCount: big.NewInt(20),
-		Active:    false,
-	}
+	c1 := Candidate{common.HexToAddress("0x1"), binder, beneficiary, big.NewInt(100),
+		false, false, []byte("/p2p/1"), []byte("node1.com"), []byte("node1")}
+	c2 := Candidate{common.HexToAddress("0x2"), binder, beneficiary, big.NewInt(20),
+		true, true, []byte("/p2p/2"), []byte("node2.com"), []byte("node2")}
 
-	var cl CandidateList
-	cl = append(cl, c1)
-	cl = append(cl, c2)
-
-	cl.Swap(0, 1)
-	if cl[0].equal(&c2) == false {
-		t.Errorf("cl[0] should equal c2")
+	candidates := CandidateList{c1, c2}
+	swaped := CandidateList{c2, c1}
+	candidates.Swap(0, 1)
+	for i, tt := range candidates {
+		if tt.equal(&swaped[i]) == false {
+			t.Errorf("index: %d, expect: %s, got: %s", i, swaped[i].String(), tt.String())
+		}
 	}
-	if cl[1].equal(&c1) == false {
-		t.Errorf("cl[1] should equal c1")
+}
+
+func TestCandidateList_Sort(t *testing.T) {
+	// c1票数为负，c2与c5票数相等，c3票数最多
+	c1 := Candidate{common.HexToAddress("0x1"), binder, beneficiary, big.NewInt(100),
+		false, false, []byte("/p2p/1"), []byte("node1.com"), []byte("node1")}
+	c2 := Candidate{common.HexToAddress("0x2"), binder, beneficiary, big.NewInt(20),
+		true, true, []byte("/p2p/2"), []byte("node2.com"), []byte("node2")}
+	c3 := Candidate{common.HexToAddress("0x3"), binder, beneficiary, big.NewInt(90),
+		true, true, []byte("/p2p/3"), []byte("node3.com"), []byte("node3")}
+	c4 := Candidate{common.HexToAddress("0x4"), binder, beneficiary, big.NewInt(40),
+		true, true, []byte("/p2p/4"), []byte("node4.com"), []byte("node4")}
+	c5 := Candidate{common.HexToAddress("0x5"), binder, beneficiary, big.NewInt(20),
+		true, true, []byte("/p2p/5"), []byte("node5.com"), []byte("node5")}
+	candidates := CandidateList{c1, c2, c3, c4, c5}
+	sorted := CandidateList{c3, c4, c2, c5, c1}
+
+	candidates.Sort()
+	for i, tt := range candidates {
+		if tt.equal(&sorted[i]) == false {
+			t.Errorf("index: %d, expect: %s, got: %s", i, sorted[i].String(), tt.String())
+		}
 	}
 }
 
@@ -304,13 +354,20 @@ func TestVoteTooManyCandidates(t *testing.T) {
 	addr := common.BytesToAddress([]byte{111})
 
 	var candidates []common.Address
-	for i := 1; i <= voteLimit+1; i++ {
+	for i := 1; i <= VoteLimit+1; i++ {
 		candidate := common.BytesToAddress([]byte{byte(i)})
 		candidates = append(candidates, candidate)
-		c.registerWitness(candidate, url)
+		website := "www.testnet.info" + strconv.Itoa(i)
+		name := "testinfo" + strconv.Itoa(i)
+		p2pUrl := []byte(string(url)[:13] + strconv.Itoa(i) + string(url)[14:])
+		// t.Logf("url: %s", string(p2pUrl))
+		info := &NodeInfo{p2pUrl, []byte(website), []byte(name), binder, beneficiary}
+		if err := c.registerWitness(candidate, info); err != nil {
+			t.Errorf("register failed, addr: %s, error: %s", candidate.String(), err)
+		}
 	}
 	err := c.voteWitnesses(addr, candidates)
-	if err.Error() != fmt.Sprintf("you voted too many candidates: the limit is %d, you voted %d", voteLimit, len(candidates)) {
+	if err.Error() != fmt.Sprintf("you voted too many candidates: the limit is %d, you voted %d", VoteLimit, len(candidates)) {
 		t.Error(err)
 	}
 }
@@ -342,11 +399,15 @@ func TestVoteWithoutEnoughTimeGap(t *testing.T) {
 		Owner:     addr,
 		TimeStamp: big.NewInt(1531328500),
 	}
-	c.setVoter(voter)
+	if err := c.setVoter(voter); err != nil {
+		t.Errorf("addr: %s, error: %s", voter.Owner, err)
+	}
 
 	// 抵押
 	c.context.GetStateDb().AddBalance(addr, big.NewInt(1e18))
-	c.stake(addr, big.NewInt(1))
+	if err := c.stake(addr, vnt2wei(1)); err != nil {
+		t.Errorf("stake failed, addr: %s, error: %s", addr.String(), err)
+	}
 	// 投票
 	err := c.voteWitnesses(addr, candidates)
 	if err.Error() != fmt.Sprintf("it's less than 24h after your last vote or setProxy, lastTime: %v, now: %v", voter.TimeStamp, c.context.GetTime()) {
@@ -362,11 +423,19 @@ func TestVoteCandidatesFistTime(t *testing.T) {
 
 	addr := common.BytesToAddress([]byte{111})
 	c.context.GetStateDb().AddBalance(addr, big.NewInt(0).Mul(big.NewInt(10), big.NewInt(1e18)))
-	c.stake(addr, big.NewInt(10))
+	if err := c.stake(addr, vnt2wei(10)); err != nil {
+		t.Errorf("stake failed, addr: %s, error: %s", addr.String(), err)
+	}
 
 	// 候选人注册
 	for i := 0; i < len(candidates); i++ {
-		c.registerWitness(candidates[i], url)
+		website := "www.testnet.info" + strconv.Itoa(i)
+		name := "testinfo" + strconv.Itoa(i)
+		p2pUrl := []byte(string(url)[:13] + strconv.Itoa(i) + string(url)[14:])
+		info := &NodeInfo{p2pUrl, []byte(website), []byte(name), binder, beneficiary}
+		if err := c.registerWitness(candidates[i], info); err != nil {
+			t.Errorf("register failed, addr: %s, error: %s", candidates[i].String(), err)
+		}
 	}
 
 	// 投票
@@ -375,7 +444,7 @@ func TestVoteCandidatesFistTime(t *testing.T) {
 		t.Error(err)
 	}
 
-	if _, err := checkValid(c); err != nil {
+	if _, err := checkValid(t, c); err != nil {
 		t.Error(err)
 	}
 }
@@ -406,7 +475,9 @@ func TestCancelVoteWithProxy(t *testing.T) {
 		Proxy:     common.BytesToAddress([]byte{10}),
 		TimeStamp: big.NewInt(1531328510),
 	}
-	c.setVoter(voter)
+	if err := c.setVoter(voter); err != nil {
+		t.Errorf("addr: %s, error: %s", voter.Owner, err)
+	}
 
 	err := c.cancelVote(addr)
 	if err.Error() != fmt.Sprintf("must cancel proxy first, proxy: %x", voter.Proxy) {
@@ -423,39 +494,55 @@ func TestCancelVote(t *testing.T) {
 
 	// 抵押1
 	c.context.GetStateDb().AddBalance(addr, big.NewInt(0).Mul(big.NewInt(10), big.NewInt(1e18)))
-	c.stake(addr, big.NewInt(10))
+	if err := c.stake(addr, vnt2wei(10)); err != nil {
+		t.Errorf("stake failed, addr: %s, error: %s", addr.String(), err)
+	}
 
 	// 抵押2
-	c.context.GetStateDb().AddBalance(addr1, big.NewInt(0).Mul(big.NewInt(10), big.NewInt(1e18)))
-	c.stake(addr, big.NewInt(100))
+	c.context.GetStateDb().AddBalance(addr1, big.NewInt(0).Mul(big.NewInt(100), big.NewInt(1e18)))
+	if err := c.stake(addr1, vnt2wei(100)); err != nil {
+		t.Errorf("stake failed, addr: %s, error: %s", addr.String(), err)
+	}
 
 	// 设置候选人
 	for i := 0; i < len(candidates); i++ {
-		c.registerWitness(candidates[i], url)
+		website := "www.testnet.info" + strconv.Itoa(i)
+		name := "testinfo" + strconv.Itoa(i)
+		p2pUrl := []byte(string(url)[:13] + strconv.Itoa(i) + string(url)[14:])
+		info := &NodeInfo{p2pUrl, []byte(website), []byte(name), binder, beneficiary}
+		if err := c.registerWitness(candidates[i], info); err != nil {
+			t.Errorf("register failed, addr: %s, error: %s", candidates[i].String(), err)
+		}
 	}
 
 	// 投票1
-	c.voteWitnesses(addr, candidates)
+	if err := c.voteWitnesses(addr, candidates); err != nil {
+		t.Errorf("vote addr: %s, error: %s", addr.String(), err)
+	}
 	voteCount := c.calculateVoteCount(big.NewInt(10))
-	if _, err := checkValid(c); err != nil {
+	if _, err := checkValid(t, c); err != nil {
 		t.Error(err)
 	}
 
 	// 投票2
-	c.voteWitnesses(addr1, candidates)
+	if err := c.voteWitnesses(addr1, candidates); err != nil {
+		t.Errorf("vote addr: %s, error: %s", addr1.String(), err)
+	}
 	voteCount1 := c.calculateVoteCount(big.NewInt(100))
 	totalVoteCount := new(big.Int).Set(voteCount)
 	totalVoteCount.Add(totalVoteCount, voteCount1)
 
 	// 验证2
-	if _, err := checkValid(c); err != nil {
+	if _, err := checkValid(t, c); err != nil {
 		t.Error(err)
 	}
 
 	// 取消投票
-	c.cancelVote(addr)
+	if err := c.cancelVote(addr); err != nil {
+		t.Errorf("cancelVote, addr: %s, error: %s", addr.String(), err)
+	}
 
-	if _, err := checkValid(c); err != nil {
+	if _, err := checkValid(t, c); err != nil {
 		t.Error(err)
 	}
 }
@@ -481,10 +568,10 @@ func TestProxySelfIsProxy(t *testing.T) {
 	addr := common.BytesToAddress([]byte{111})
 	proxy := common.BytesToAddress([]byte{10})
 	// addr 成为代理
-	c.startProxy(addr)
-
-	err := c.setProxy(addr, proxy)
-	if err.Error() != "account registered as a proxy is not allowed to use a proxy" {
+	if err := c.startProxy(addr); err != nil {
+		t.Errorf("start proxy, addr: %s, error: %s", addr.String(), err)
+	}
+	if err := c.setProxy(addr, proxy); err.Error() != "account registered as a proxy is not allowed to use a proxy" {
 		t.Error(err)
 	}
 }
@@ -517,11 +604,15 @@ func TestProxyWithoutEnoughTimeGap(t *testing.T) {
 		Owner:     addr,
 		TimeStamp: big.NewInt(1531328500),
 	}
-	c.setVoter(voter)
+	if err := c.setVoter(voter); err != nil {
+		t.Errorf("addr: %s, error: %s", voter.Owner, err)
+	}
 
 	// 抵押
 	c.context.GetStateDb().AddBalance(addr, big.NewInt(1e18))
-	c.stake(addr, big.NewInt(1))
+	if err := c.stake(addr, vnt2wei(1)); err != nil {
+		t.Errorf("stake failed, addr: %s, error: %s", addr.String(), err)
+	}
 	// 设置代理
 	err := c.setProxy(addr, proxy)
 	if err.Error() != fmt.Sprintf("it's less than 24h after your last vote or setProxy, lastTime: %v, now: %v", voter.TimeStamp, c.context.GetTime()) {
@@ -539,7 +630,10 @@ func TestProxyIsNotProxy(t *testing.T) {
 
 	// 抵押
 	c.context.GetStateDb().AddBalance(addr, big.NewInt(1e18))
-	c.stake(addr, big.NewInt(1))
+	if err := c.stake(addr, vnt2wei(1)); err != nil {
+		t.Errorf("stake failed, addr: %s, error: %s", addr.String(), err)
+	}
+
 	// 设置代理
 	err := c.setProxy(addr, proxy)
 	if err.Error() != fmt.Sprintf("%x is not a proxy", proxy) {
@@ -551,7 +645,7 @@ func TestSetProxy(t *testing.T) {
 	context := newcontext()
 	c := newElectionContext(context)
 
-	err := setProxy(c)
+	err := setProxy(t, c)
 	if err != nil {
 		t.Error(err)
 	}
@@ -581,7 +675,9 @@ func TestCancelProxyNoProxy(t *testing.T) {
 		Owner:     addr,
 		TimeStamp: big.NewInt(1531328500),
 	}
-	c.setVoter(voter)
+	if err := c.setVoter(voter); err != nil {
+		t.Errorf("addr: %s, error: %s", voter.Owner, err)
+	}
 
 	err := c.cancelProxy(addr)
 	if err.Error() != "not set proxy" {
@@ -596,25 +692,24 @@ func TestCancelProxy(t *testing.T) {
 	c := newElectionContext(context)
 
 	addr := common.BytesToAddress([]byte{111})
-	err := setProxy(c)
+	err := setProxy(t, c)
 	if err != nil {
 		t.Error(err)
 	}
-	voteCount := c.calculateVoteCount(big.NewInt(100))
+
 	// 取消代理
 	err = c.cancelProxy(addr)
 	if err != nil {
 		t.Error(err)
 	}
 
-	for i := 0; i < len(candidates); i++ {
-		candi := c.getCandidate(candidates[i])
-		if candi.VoteCount.Cmp(voteCount) != 0 {
-			t.Errorf("The vote count %v is Wrong!", candi.VoteCount)
-		}
+	voteCount := c.calculateVoteCount(big.NewInt(100))
+	candi := c.getCandidate(candidate.Owner)
+	if candi.VoteCount.Cmp(voteCount) != 0 {
+		t.Fatalf("Proxy test want vote count: %v, got: %v", voteCount, candi.VoteCount)
 	}
 
-	if _, err := checkValid(c); err != nil {
+	if _, err := checkValid(t, c); err != nil {
 		t.Error(err)
 	}
 }
@@ -624,7 +719,7 @@ func TestCancelProxy(t *testing.T) {
 func TestStartProxyWithIsProxy(t *testing.T) {
 	context := newcontext()
 	c := newElectionContext(context)
-	err := setProxy(c)
+	err := setProxy(t, c)
 	if err != nil {
 		t.Error(err)
 	}
@@ -640,7 +735,7 @@ func TestStartProxyWithIsProxy(t *testing.T) {
 func TestStartProxyWithSetProxy(t *testing.T) {
 	context := newcontext()
 	c := newElectionContext(context)
-	err := setProxy(c)
+	err := setProxy(t, c)
 	if err != nil {
 		t.Error(err)
 	}
@@ -671,11 +766,11 @@ func TestStopProxyNotProxy(t *testing.T) {
 
 	voter := newVoter()
 	voter.Owner = common.BytesToAddress([]byte{111})
-	err := c.setVoter(voter)
-	if err != nil {
-		t.Error(err)
+	if err := c.setVoter(voter); err != nil {
+		t.Errorf("addr: %s, error: %s", voter.Owner, err)
 	}
-	err = c.stopProxy(common.BytesToAddress([]byte{111}))
+
+	err := c.stopProxy(common.BytesToAddress([]byte{111}))
 	if err.Error() != "stopProxy address is not proxy" {
 		t.Error(err)
 	}
@@ -696,11 +791,19 @@ func TestStartAndStopProxy(t *testing.T) {
 	addr := common.BytesToAddress([]byte{111})
 	addr1 := common.BytesToAddress([]byte{50})
 	proxy := common.BytesToAddress([]byte{10})
-	c.context.GetStateDb().AddBalance(addr1, big.NewInt(0).Mul(big.NewInt(20), big.NewInt(1e18)))
-	c.stake(addr1, big.NewInt(20))
+	db := c.context.GetStateDb()
+	db.AddBalance(addr1, big.NewInt(0).Mul(big.NewInt(20), big.NewInt(1e18)))
+	stakeVnt := vnt2wei(20)
+	testTransfer(db, addr1, contractAddr, stakeVnt)
+	if err := c.stake(addr1, stakeVnt); err != nil {
+		t.Errorf("stake failed, addr: %s, error: %s", addr.String(), err)
+	}
+	if db.GetBalance(contractAddr).Cmp(stakeVnt) != 0 {
+		t.Fatalf("contract do not have enough vnt")
+	}
 
 	// addr 设置 proxy为代理
-	err := setProxy(c)
+	err := setProxy(t, c)
 	if err != nil {
 		t.Error(err)
 	}
@@ -710,36 +813,56 @@ func TestStartAndStopProxy(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if _, err := checkValid(c); err != nil {
+	if _, err := checkValid(t, c); err != nil {
 		t.Error(err)
 	}
 
 	// 停止代理，原先代理的票都还有效
-	c.stopProxy(proxy)
+	if err := c.stopProxy(proxy); err != nil {
+		t.Errorf("stop proxy, addr: %s, error: %s", proxy.String(), err)
+	}
 	if ctx, ok := c.context.(*testContext); ok {
 		ctx.SetTime(big.NewInt(1531795552))
 	}
-	c.voteWitnesses(proxy, candidates)
-	if _, err := checkValid(c); err != nil {
+	if err := c.voteWitnesses(proxy, candidates); err != nil {
+		t.Errorf("vote, addr: %s, error: %s", proxy.String(), err)
+	}
+	if _, err := checkValid(t, c); err != nil {
 		t.Error(err)
 	}
 
 	// 取消addr交给proxy的代理
-	c.cancelProxy(addr)
-	if _, err := checkValid(c); err != nil {
+	if err := c.cancelProxy(addr); err != nil {
+		t.Errorf("cancel proxy, addr: %s, error: %s", addr.String(), err)
+	}
+	if _, err := checkValid(t, c); err != nil {
 		t.Error(err)
 	}
 
 	// 重新开始代理
-	c.startProxy(proxy)
-	c.unStake(addr1)
+	if err := c.startProxy(proxy); err != nil {
+		t.Errorf("start proxy, addr: %s, error: %s", proxy.String(), err)
+	}
+	if err := c.unStake(addr1); err != nil {
+		t.Errorf("unstake, addr: %s, error: %s", addr1.String(), err)
+	}
 	c.context.GetStateDb().AddBalance(addr1, big.NewInt(0).Mul(big.NewInt(20), big.NewInt(1e18)))
-	c.stake(addr1, big.NewInt(30))
+	if err := c.stake(addr1, vnt2wei(30)); err != nil {
+		t.Errorf("stake, addr: %s, error: %s", addr1.String(), err)
+	}
+
 	// 设置代理
-	c.setProxy(common.BytesToAddress([]byte{100}), proxy)
-	if _, err := checkValid(c); err != nil {
+	if err := c.setProxy(addr1, proxy); err != nil {
+		t.Errorf("set proxy, addr: %s, error: %s", addr1.String(), err)
+	}
+	if _, err := checkValid(t, c); err != nil {
 		t.Error(err)
 	}
+}
+
+func testTransfer(db inter.StateDB, sender, receiver common.Address, amount *big.Int) {
+	db.AddBalance(receiver, amount)
+	db.SubBalance(sender, amount)
 }
 
 func TestStopAndSetProxy(t *testing.T) {
@@ -757,7 +880,7 @@ func TestStopAndSetProxy(t *testing.T) {
 	proxy := common.BytesToAddress([]byte{10})
 
 	// addr 设置 proxy为代理
-	err := setProxy(c)
+	err := setProxy(t, c)
 	if err != nil {
 		t.Error(err)
 	}
@@ -771,12 +894,16 @@ func TestStopAndSetProxy(t *testing.T) {
 		Owner:      addr1,
 		StakeCount: big.NewInt(20),
 	}
-	c.setStake(stake)
+	if err := c.setStake(stake); err != nil {
+		t.Errorf("stake, addr: %s, error: %s", stake.Owner.String(), err)
+	}
 
 	// addr1 投票
 	// addr1 开始代理
-	c.startProxy(addr1)
-	err = c.voteWitnesses(addr1, candidates)
+	if err := c.startProxy(addr1); err != nil {
+		t.Errorf("start proxy, addr: %s, error: %s", addr1.String(), err)
+	}
+	err = c.voteWitnesses(addr1, []common.Address{candidate.Owner})
 	voteCount2 := c.calculateVoteCount(big.NewInt(20))
 	totalVoteCount := big.NewInt(0)
 	totalVoteCount.Add(voteCount, voteCount1)
@@ -785,11 +912,9 @@ func TestStopAndSetProxy(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	for i := 0; i < len(candidates); i++ {
-		candi := c.getCandidate(candidates[i])
-		if candi.VoteCount.Cmp(totalVoteCount) != 0 {
-			t.Errorf("The vote count %v is Wrong! Expected: %d", candi.VoteCount, totalVoteCount)
-		}
+	candi := c.getCandidate(candidate.Owner)
+	if candi.VoteCount.Cmp(totalVoteCount) != 0 {
+		t.Errorf("The vote count %v is Wrong! Expected: %d", candi.VoteCount, totalVoteCount)
 	}
 
 	// proxy 停止代理
@@ -811,35 +936,37 @@ func TestStopAndSetProxy(t *testing.T) {
 		t.Error(err)
 	}
 
-	for i := 0; i < len(candidates); i++ {
-		candi := c.getCandidate(candidates[i])
-		if candi.VoteCount.Cmp(totalVoteCount) != 0 {
-			t.Errorf("The vote count %v is Wrong!", candi.VoteCount)
-		}
+	candi = c.getCandidate(candidate.Owner)
+	if candi.VoteCount.Cmp(totalVoteCount) != 0 {
+		t.Errorf("The vote count %v is Wrong! Expected: %d", candi.VoteCount, totalVoteCount)
 	}
 
 	// addr 取消 proxy代理
-	c.cancelProxy(addr)
+	if err := c.cancelProxy(addr); err != nil {
+		t.Errorf("cancel proxy, addr: %s, error: %s", addr.String(), err)
+	}
 	totalVoteCount.Sub(totalVoteCount, voteCount)
 
-	for i := 0; i < len(candidates); i++ {
-		candi := c.getCandidate(candidates[i])
-		if candi.VoteCount.Cmp(totalVoteCount) != 0 {
-			t.Errorf("The vote count %v is Wrong!", candi.VoteCount)
-		}
+	candi = c.getCandidate(candidate.Owner)
+	if candi.VoteCount.Cmp(totalVoteCount) != 0 {
+		t.Errorf("The vote count %v is Wrong! Expected: %d", candi.VoteCount, totalVoteCount)
 	}
 }
 
-func setProxy(c electionContext) error {
+func setProxy(t *testing.T, c electionContext) error {
 	addr := common.BytesToAddress([]byte{111})
 	proxy := common.BytesToAddress([]byte{10})
 	// 账户addr抵押
 	c.context.GetStateDb().AddBalance(addr, big.NewInt(0).Mul(big.NewInt(10), big.NewInt(1e18)))
-	c.stake(addr, big.NewInt(10))
+	if err := c.stake(addr, vnt2wei(10)); err != nil {
+		t.Errorf("stake, addr: %s, error: %s", addr.String(), err)
+	}
 
 	// 账户proxy抵押
 	c.context.GetStateDb().AddBalance(proxy, big.NewInt(0).Mul(big.NewInt(100), big.NewInt(1e18)))
-	c.stake(proxy, big.NewInt(100))
+	if err := c.stake(proxy, vnt2wei(100)); err != nil {
+		t.Errorf("stake, addr: %s, error: %s", proxy.String(), err)
+	}
 
 	// 账户proxy注册成为代理
 	err := c.startProxy(proxy)
@@ -853,18 +980,16 @@ func setProxy(c electionContext) error {
 		return err
 	}
 
-	// 设置候选人
-	for i := 0; i < len(candidates); i++ {
-		c.registerWitness(candidates[i], url)
-	}
+	// 保存已active的候选人
+	c.setCandidate(candidate)
 
 	// 代理人投票
-	err = c.voteWitnesses(proxy, candidates)
+	err = c.voteWitnesses(proxy, []common.Address{candidate.Owner})
 	if err != nil {
 		return err
 	}
 
-	if _, err := checkValid(c); err != nil {
+	if _, err := checkValid(t, c); err != nil {
 		return err
 	}
 	return nil
@@ -877,54 +1002,79 @@ func TestRegisterWitness(t *testing.T) {
 	addr1 := common.HexToAddress("41b0db166cfdf1c4ba3ce657171482a9aa55cc93")
 	addr2 := common.HexToAddress("08b467a881ec34b668254aa956e0c46f9c3b2b83")
 	addr3 := common.HexToAddress("0c0292587ccdc76b8f449002a017bc9479ff0a88")
+	addr4 := common.HexToAddress("0a0292587ccdc76b8f449002a017bc9479ff0a88")
+	addr5 := common.HexToAddress("0b0292587ccdc76b8f449002a017bc9479ff0a88")
+	addr6 := common.HexToAddress("0d0292587ccdc76b8f449002a017bc9479ff0a88")
+	addr7 := common.HexToAddress("0e0292587ccdc76b8f449002a017bc9479ff0a88")
 
 	t.Logf("addr1: %v", addr1.Hex())
 	t.Logf("addr2: %v", addr2.Hex())
 	t.Logf("addr3: %v", addr3.Hex())
+	t.Logf("addr4: %v", addr4.Hex())
 
-	err := ec.registerWitness(addr1, url)
-	if err != nil {
-		t.Errorf("TestRegisterWitness registerWitness err:%v", err)
+	complicatedErr := fmt.Errorf("complicated error, not compare error content")
+	// 注册见证人的测试用例，err为nil代表需要注册成功
+	ts := []struct {
+		addr     common.Address
+		url      []byte
+		website  []byte
+		name     []byte
+		err      error
+		matchErr bool   // 是否对error内容进行匹配，p2p类别的错误不易的，可设置为false
+		desc     string // 本case的描述
+	}{
+		{addr1, []byte("/ip4/127.0.0.1/tcp/30303/ipfs/1kHNAAfnqXNsxMwJf6QjJFRmVK7iB32U9owwK9KfeLFxEA7"), []byte("www.testnet1.site"), []byte("node1"), nil, true, "node1 success"},
+		{addr1, []byte("/ip4/127.0.0.1/tcp/30303/ipfs/1kHNAAfnqXNsxMwJf6QjJFRmVK7iB32U9owwK9KfeLFxEA7"), []byte("www.testnet1.site"), []byte("node1"), ErrCandiAlreadyReg, true, "node1 dup-register"},
+		{addr2, []byte("/ip4/127.0.0.1/tcp/30303/ipfs/1kHcch6yuBCgC5nPPSK3Yp7Es4c4eenxAeK167pYwUvNjRo"), []byte("www.testnet2.site"), []byte("node2"), nil, true, "node2 success"},
+		{addr3, []byte("/ip4/127.0.0.1/tcp/30303/ipfs/1kHJFKr2bzUnMr1NbeyYbYJa3RXT18cEu7cNDrHWjg8XYKB"), []byte("www.testnet3.site"), []byte("node3"), nil, true, "node3 success"},
+		{addr4, []byte("/ip4/127.0.0.1/tcp/30303/ipfs/1kHfop9dnUHHmtBXVkLB5UauAmACtrsEX5H5t6oCRpdL198"), []byte("www.testnet4.site"), []byte("s"), ErrCandiNameLenInvalid, true, "node4 too short name"},
+		{addr4, []byte("/ip4/127.0.0.1/tcp/30303/ipfs/1kHfop9dnUHHmtBXVkLB5UauAmACtrsEX5H5t6oCRpdL198"), []byte("www.testnet4.site"), []byte("tooloooooooooooooname"), ErrCandiNameLenInvalid, true, "node4 too long name"},
+		{addr4, []byte("/ip4/127.0.0.1/tcp/30303/ipfs/1kHfop9dnUHHmtBXVkLB5UauAmACtrsEX5H5t6oCRpdL198"), []byte("ww"), []byte("right name"), ErrCandiUrlLenInvalid, true, "node4 too short website"},
+		{addr4, []byte("/ip4/127.0.0.1/tcp/30303/ipfs/1kHfop9dnUHHmtBXVkLB5UauAmACtrsEX5H5t6oCRpdL198"), []byte("www.looooooooooooooooooooooooooooooooooooongwebsite.com/looog"), []byte("right name"), ErrCandiUrlLenInvalid, true, "node4 too long website"},
+		{addr4, []byte("/ip4/127.0.0.1/tcp/30303/ipfs/1kHfop9dnUHHmtBXVkLB5UauAmACtrsEX5H5t6oCRpdL198"), []byte("www.testnet4.site"), []byte("ABCEFacd"), ErrCandiNameInvalid, true, "node4 name should lowercase"},
+		{addr4, []byte("/ip4/127.0.0.1/tcp/30303/ipfs/1kHfop9dnUHHmtBXVkLB5UauAmACtrsEX5H5t6oCRpdL198"), []byte("www.testnet4.site"), []byte("acd xyz"), ErrCandiNameInvalid, true, "node4 name should only contain lowercase letter and digits"},
+		{addr4, []byte("/ip4/127.0.0.1/tcp/30303/ipfs/1kHfop9dnUHHmtBXVkLB5UauAmACtrsEX5H5t6oCRpdL198"), []byte("www.testnet4.site"), []byte("acd.xyz"), ErrCandiNameInvalid, true, "node4 name should only contain lowercase letter and digits"},
+		{addr4, []byte("/ip4/127.0.0.1/tcp/30303/ipfs/1kHfop9dnUHHmtBXVkLB5UauAmACtrsEX5H5t6oCRpdL198"), []byte("www.testnet4.site"), []byte("node3"), ErrCandiInfoDup, true, "node4 dup name"},
+		{addr4, []byte("/ip4/127.0.0.1/tcp/30303/ipfs/1kHfop9dnUHHmtBXVkLB5UauAmACtrsEX5H5t6oCRpdL198"), []byte("www.testnet3.site"), []byte("node4"), ErrCandiInfoDup, true, "node4 dup website"},
+		{addr4, []byte("/ip9/127.0.0.1/tcp/30303/ipfs/1kHfop9dnUHHmtBXVkLB5UauAmACtrsEX5H5t6oCRpdL198"), []byte("www.testnet4.site"), []byte("node4"), fmt.Errorf("registerWitness node url is error: no protocol with name ip9"), true, "node4 node url invalid: ip9"},
+		{addr4, []byte("/ip4/127.0.0.1/tcp/30303/ipfs/1kHfop9dnUHHmtskLfs5fdafemACtfsEX5H5t6oCRpdL1"), []byte("www.testnet4.site"), []byte("node4"), complicatedErr, false, "node4 node url invalid: id is less"},
+		{addr4, []byte("/ip4/127.0.0.1/txp/30303/ipfs/1kHfop9dnUHHmtskLfs5fdafemACtfsEX5H5t6oCRpdL198"), []byte("www.testnet4.site"), []byte("node4"), fmt.Errorf("registerWitness node url is error: no protocol with name txp"), true, "node4 node url invalid: not tcp"},
+		{addr4, []byte("/ip4/127.0.0.1/tcp/30303/ipfs/1111111111111111111111111111111111111111RpdL198"), []byte("www.testnet4.site"), []byte("node4"), complicatedErr, false, "node4 node url invalid: id is invalid"},
+		{addr4, []byte("/ip4/127.0.0.1/tcp/30303/ipfs/1kHfop9dnUHHmtBXVkLB5UauAmACtrsEX5H5t6oCRpdL198"), []byte("www.testnet4.site"), []byte("node4"), nil, true, "node4 success"},
+		{addr5, []byte("/ip4/127.0.0.1/tcp/30303/ipfs/1kHGG8L1DTrVG3Cad479Q32oGmFAiEjLFwxzNyXH3ehGo73"), []byte("www.testnet5.site"), []byte("20charactornaaaaaame"), nil, true, "node5 success"},
+		{addr6, []byte("/ip4/127.0.0.1/tcp/30303/ipfs/1kHmExX4yutwBZLbRsYHq59KfgiM1LUJFW2JSPeSCcBf7rH"), []byte("www"), []byte("node6"), nil, true, "node6 success"},
+		{addr7, []byte("/ip4/127.0.0.1/tcp/30303/ipfs/1kHSMhv82q5thJkdeJzxCVW8tdXwaDThBZWsH2Q9KUGGFUq"), []byte("www.just60charactor.com/loooooooooooooooooooooooooooooooooog"), []byte("node7"), nil, true, "node7 success"},
+	}
+
+	for i, c := range ts {
+		info := &NodeInfo{c.url, c.website, c.name, binder, beneficiary}
+		err := ec.registerWitness(c.addr, info)
+		if !reflect.DeepEqual(err, c.err) {
+			if c.matchErr {
+				t.Errorf("TestRegisterWitness case %d, case discrition: %s, want err :%v, got:%v", i, c.desc, c.err, err)
+			}
+		}
+	}
+
+	// addr1注册成功了，它应当是register为true，bind为false，active为false
+	ca := ec.getCandidate(addr1)
+	if ca.Owner != addr1 || !ca.Registered || ca.Bind || ca.Active() {
+		t.Errorf("addr1 should success and check the active information: %v", ca.String())
 	}
 
 	candis := getAllCandidate(context.GetStateDb())
 	for _, candi := range candis {
-		t.Logf("111 addr: %v, voteCount: %v, active: %v", candi.Owner.Hex(), candi.VoteCount, candi.Active)
+		t.Logf("333 addr: %v, voteCount: %v, active: %v", candi.Owner.Hex(), candi.VoteCount, candi.Active())
 	}
 
-	err = ec.registerWitness(addr1, url)
-	if err.Error() != "registerWitness witness already exists" {
-		t.Errorf("TestRegisterWitness registerWitness err:%v", err)
-	}
-
-	candis = getAllCandidate(context.GetStateDb())
-	for _, candi := range candis {
-		t.Logf("222 addr: %v, voteCount: %v, active: %v", candi.Owner.Hex(), candi.VoteCount, candi.Active)
-	}
-
-	err = ec.registerWitness(addr2, url)
-	if err != nil {
-		t.Errorf("TestRegisterWitness registerWitness err:%v", err)
-	}
-
-	err = ec.registerWitness(addr3, url)
-	if err != nil {
-		t.Errorf("TestRegisterWitness registerWitness err:%v", err)
-	}
-
-	candis = getAllCandidate(context.GetStateDb())
-	for _, candi := range candis {
-		t.Logf("333 addr: %v, voteCount: %v, active: %v", candi.Owner.Hex(), candi.VoteCount, candi.Active)
-	}
-
-	err = ec.unregisterWitness(addr1)
+	err := ec.unregisterWitness(addr1)
 	if err != nil {
 		t.Errorf("TestRegisterWitness unregisterWitness err:%v", err)
 	}
 
 	candis = getAllCandidate(context.GetStateDb())
 	for _, candi := range candis {
-		t.Logf("444 addr: %v, voteCount: %v, active: %v", candi.Owner.Hex(), candi.VoteCount, candi.Active)
+		t.Logf("444 addr: %v, voteCount: %v, active: %v", candi.Owner.Hex(), candi.VoteCount, candi.Active())
 	}
 
 	err = ec.unregisterWitness(addr3)
@@ -934,7 +1084,7 @@ func TestRegisterWitness(t *testing.T) {
 
 	candis = getAllCandidate(context.GetStateDb())
 	for _, candi := range candis {
-		t.Logf("555 addr: %v, voteCount: %v, active: %v", candi.Owner.Hex(), candi.VoteCount, candi.Active)
+		t.Logf("555 addr: %v, voteCount: %v, active: %v", candi.Owner.Hex(), candi.VoteCount, candi.Active())
 	}
 
 	err = ec.unregisterWitness(addr2)
@@ -944,7 +1094,7 @@ func TestRegisterWitness(t *testing.T) {
 
 	candis = getAllCandidate(context.GetStateDb())
 	for _, candi := range candis {
-		t.Logf("666 addr: %v, voteCount: %v, active: %v", candi.Owner.Hex(), candi.VoteCount, candi.Active)
+		t.Logf("666 addr: %v, voteCount: %v, active: %v", candi.Owner.Hex(), candi.VoteCount, candi.Active())
 	}
 }
 
@@ -996,133 +1146,152 @@ func TestRegisterProxy(t *testing.T) {
 	}
 }
 
+type stakeCase struct {
+	bal   *big.Int // 账号总余额
+	vnt   *big.Int // 抵押的VNT数
+	stake *big.Int // 预期的抵押计数
+}
+
+// 测试抵押能成功的流程
 func TestStake(t *testing.T) {
+	sc := []stakeCase{
+		// 整数
+		{
+			vnt2wei(100),
+			vnt2wei(20),
+			big.NewInt(20),
+		},
+		// 抵押代币非VNT整数
+		{
+			vnt2wei(100),
+			big.NewInt(0).Add(vnt2wei(20), big.NewInt(100)),
+			big.NewInt(20),
+		},
+	}
+
+	for i, c := range sc {
+		t.Logf("case %v\n", i)
+		testStakeWithCase(t, &c)
+	}
+}
+
+func testStakeWithCase(t *testing.T, c *stakeCase) {
 	context := newcontext()
 	ec := newElectionContext(context)
+	db := ec.context.GetStateDb()
+	addr := common.HexToAddress("41b0db166cfdf1c4ba3ce657171482a9aa55cc93")
+	db.AddBalance(addr, c.bal)
 
-	addr1 := common.HexToAddress("41b0db166cfdf1c4ba3ce657171482a9aa55cc93")
+	// 模拟vm转账
+	db.AddBalance(contractAddr, c.vnt)
+	db.SubBalance(addr, c.vnt)
 
-	context.GetStateDb().AddBalance(addr1, big.NewInt(0).Mul(big.NewInt(10000000000), big.NewInt(10000000000)))
-
-	err := ec.stake(addr1, big.NewInt(20))
+	err := ec.stake(addr, c.vnt)
 	if err != nil {
 		t.Errorf("TestStake stake err:%v ", err)
 	}
+	stake := ec.getStake(addr)
+	checkStake(t, &stake, addr, c.vnt, c.stake)
 
-	t.Logf("111 addr1 balance: %v", context.GetStateDb().GetBalance(addr1))
+	bal := db.GetBalance(addr)
+	shouldLeft := big.NewInt(0).Sub(c.bal, c.vnt)
+	if bal.Cmp(shouldLeft) != 0 {
+		t.Fatalf("after stake addr should have %v wei got %v wei", shouldLeft.String(), bal.String())
+	}
 
-	stake := ec.getStake(addr1)
-	t.Logf("111 addr1 stake: %v", stake.StakeCount)
-
-	err = ec.unStake(addr1)
+	// 取消抵押
+	err = ec.unStake(addr)
 	if err.Error() != "cannot unstake in 24 hours" {
 		t.Errorf("TestStake unStake err:%v ", err)
 	}
+	stake = ec.getStake(addr)
+	checkStake(t, &stake, addr, c.vnt, c.stake)
 
-	t.Logf("222 addr1 balance after unStake: %v", context.GetStateDb().GetBalance(addr1))
-
-	stake = ec.getStake(addr1)
-	t.Logf("222 addr1 stake after unStake: %v", stake.StakeCount)
-
-	if ctx, ok := context.(*testContext); ok {
-		ctx.SetTime(big.NewInt(0).Add(context.GetTime(), big.NewInt(3600*24+1)))
-	}
-	err = ec.unStake(addr1)
+	// 取消抵押
+	twentyFourHoursLater(t, context)
+	err = ec.unStake(addr)
 	if err != nil {
 		t.Errorf("TestStake unStake err:%v ", err)
 	}
+	stake = ec.getStake(addr)
+	checkStake(t, &stake, addr, common.Big0, common.Big0)
+}
 
-	t.Logf("333 addr1 balance after unStake: %v", context.GetStateDb().GetBalance(addr1))
+func checkStake(t *testing.T, stake *Stake, expAddr common.Address, expVnt, expStake *big.Int) {
+	if stake.Owner == expAddr {
+		if stake.StakeCount.Cmp(expStake) != 0 {
+			t.Fatalf("stake and get stake mismatch, want: %v, got: %v", expStake.String(), stake.StakeCount.String())
+		}
+		if stake.Vnt.Cmp(expVnt) != 0 {
+			t.Fatalf("stake and get vnt mismatch, want: %v, got: %v Wei", expVnt.String(), stake.Vnt.String())
+		}
+	} else {
+		t.Fatalf("stake failed, can not get saved stake for addr: %v", expAddr)
+	}
+}
 
-	stake = ec.getStake(addr1)
-	t.Logf("333 addr1 stake after unStake: %v", stake.StakeCount)
+func twentyFourHoursLater(t *testing.T, context inter.ChainContext) {
+	if ctx, ok := context.(*testContext); ok {
+		ctx.SetTime(big.NewInt(0).Add(context.GetTime(), big.NewInt(3600*24+1)))
+	}
+}
 
-	err = ec.stake(addr1, big.NewInt(-20))
-	if err.Error() != "stake stakeCount less than 0" {
+func TestStakeInvalid(t *testing.T) {
+	context := newcontext()
+	ec := newElectionContext(context)
+	db := ec.context.GetStateDb()
+	addr := common.HexToAddress("41b0db166cfdf1c4ba3ce657171482a9aa55cc93")
+	db.AddBalance(addr, vnt2wei(100))
+
+	// 抵押负值
+	err := ec.stake(addr, vnt2wei(-20))
+	if err.Error() != "stake stakeCount less than 1 VNT" {
 		t.Errorf("TestStake stake err:%v ", err)
 	}
 
-	t.Logf("444 addr1 balance: %v", context.GetStateDb().GetBalance(addr1))
-
-	stake = ec.getStake(addr1)
-	t.Logf("444 addr1 stake: %v", stake.StakeCount)
-}
-
-func TestExtractBounty(t *testing.T) {
-	context := newcontext()
-	ec := newElectionContext(context)
-	ec.setCandidate(candidate)
-	if err := ec.extractOwnBounty(candidate.Owner); err != nil {
-		t.Error(err)
-	}
-	candidate1 := ec.getCandidate(candidate.Owner)
-	if candidate1.TotalBounty.Cmp(candidate1.ExtractedBounty) != 0 {
-		t.Errorf("extracted bounty %v not equal to totalBouty %v", candidate1.ExtractedBounty, candidate1.TotalBounty)
-	}
-}
-
-func TestGrantBounty(t *testing.T) {
-	context := newcontext()
-
-	if err := setRestBounty(context.GetStateDb(), bounty); err != nil {
-		t.Error(err)
-	}
-	// enough to pay
-	if rest, err := GrantBounty(context.GetStateDb(), big.NewInt(1e17)); err != nil {
-		t.Error(err)
-	} else if rest.Cmp(big.NewInt(9e17)) != 0 {
-		t.Error("the rest of bounty error")
+	stake := ec.getStake(addr)
+	if stake.Owner != emptyAddress {
+		t.Fatalf("should no stake information for addr: %v", addr.String())
 	}
 
-	// not enough to pay
-	if rest, err := GrantBounty(context.GetStateDb(), big.NewInt(1e18)); err == nil {
-		t.Error("the rest of bounty should be not enough to pay")
-	} else if rest.Cmp(big.NewInt(9e17)) != 0 {
-		t.Error("the rest of bounty error")
-	}
-
-	// just to pay
-	if rest, err := GrantBounty(context.GetStateDb(), big.NewInt(9e17)); err != nil {
-		t.Log(err)
-	} else if rest.Cmp(big.NewInt(0)) != 0 {
-		t.Error("the rest of bounty error")
+	bal := db.GetBalance(addr)
+	shouldLeft := vnt2wei(100)
+	if bal.Cmp(shouldLeft) != 0 {
+		t.Fatalf("after stake addr should have %v wei got %v wei", shouldLeft.String(), bal.String())
 	}
 }
 
 func TestCalculateVote(t *testing.T) {
 	context := newcontext()
 	ec := newElectionContext(context)
-	if ctx, ok := context.(*testContext); ok {
-		ctx.SetTime(big.NewInt(1514736000))
-	}
-
 	stakeCount := big.NewInt(10000000)
-	voteCount := ec.calculateVoteCount(stakeCount)
-	if voteCount.Cmp(big.NewInt(10000000)) != 0 {
-		t.Errorf("VoteCount %d value wrong ! It should be 10.", voteCount)
+
+	tests := []struct {
+		curTime *big.Int
+		stake   *big.Int
+		votes   *big.Int
+	}{
+		{eraTimeStamp, stakeCount, big.NewInt(10000000)},           // 半衰期开始时
+		{big.NewInt(1562256000), stakeCount, big.NewInt(14142135)}, // 半衰期半个周期：26周
+		{big.NewInt(1578067200), stakeCount, big.NewInt(20000000)}, // 半衰期一个周期：52周
+		{big.NewInt(1609430400), stakeCount, big.NewInt(40000000)}, // 半衰期二个周期：104周
 	}
 
-	if ctx, ok := context.(*testContext); ok {
-		ctx.SetTime(big.NewInt(1532080414))
-	}
-	voteCount = ec.calculateVoteCount(stakeCount)
-	if voteCount.Cmp(big.NewInt(14524228)) != 0 {
-		t.Errorf("VoteCount %d value wrong ! It should be 10.", voteCount)
-	}
-
-	if ctx, ok := context.(*testContext); ok {
-		ctx.SetTime(big.NewInt(1532225103))
-	}
-	voteCount = ec.calculateVoteCount(stakeCount)
-	if voteCount.Cmp(big.NewInt(14524228)) != 0 {
-		t.Errorf("VoteCount %d value wrong ! It should be 10.", voteCount)
+	for i, ts := range tests {
+		if ctx, ok := context.(*testContext); ok {
+			ctx.SetTime(ts.curTime)
+		}
+		voteCount := ec.calculateVoteCount(stakeCount)
+		if voteCount.Cmp(ts.votes) != 0 {
+			t.Errorf("case %d error, time: %s, stake: %s, want votes: %s, got votes: %s", i, ts.curTime.String(), ts.stake.String(), ts.votes.String(), voteCount)
+		}
 	}
 }
 
 var operates []string            // 有哪些操作
 var alreadySet map[byte]struct{} // alreadySet用来标记节点是否已经扩展过
 
-func dfsState(c electionContext, address common.Address, checkFn func(byte, string, byte) error) error {
+func dfsState(t *testing.T, c electionContext, address common.Address, checkFn func(byte, string, byte) error) error {
 	// 进入时保存当前数据库状态，退出时恢复
 	snap := c.context.GetStateDb().Snapshot()
 	defer c.context.GetStateDb().RevertToSnapshot(snap)
@@ -1131,7 +1300,7 @@ func dfsState(c electionContext, address common.Address, checkFn func(byte, stri
 		snap1 := c.context.GetStateDb().Snapshot()
 		err := operateOnState(c, op, address)
 		if err == nil {
-			if _, err = checkValid(c); err != nil {
+			if _, err = checkValid(t, c); err != nil {
 				return err
 			}
 			nextState := checkState(c, address)
@@ -1142,7 +1311,7 @@ func dfsState(c electionContext, address common.Address, checkFn func(byte, stri
 			// 如果是新的状态加入到队列中
 			if _, ok := alreadySet[nextState]; !ok {
 				alreadySet[nextState] = struct{}{}
-				err = dfsState(c, address, checkFn)
+				err = dfsState(t, c, address, checkFn)
 				if err != nil {
 					return err
 				}
@@ -1186,7 +1355,7 @@ func TestVoteAndProxyState1(t *testing.T) {
 	// 抵押一类的初始操作
 	context := newcontext()
 	c := newElectionContext(context)
-	initForStateTest(c)
+	initForStateTest(t, c)
 
 	alreadySet = make(map[byte]struct{})
 	alreadySet[0] = struct{}{}
@@ -1197,7 +1366,7 @@ func TestVoteAndProxyState1(t *testing.T) {
 		return nil
 	}
 
-	if err := dfsState(c, addr, checkFn); err != nil {
+	if err := dfsState(t, c, addr, checkFn); err != nil {
 		t.Error(err)
 	}
 }
@@ -1301,17 +1470,17 @@ func TestVoteAndProxyState2(t *testing.T) {
 	// 抵押一类的初始操作
 	context := newcontext()
 	c := newElectionContext(context)
-	initForStateTest(c)
+	initForStateTest(t, c)
 
 	alreadySet = make(map[byte]struct{})
 
 	alreadySet[4] = struct{}{}
-	if err := dfsState(c, proxy, checkFn); err != nil {
+	if err := dfsState(t, c, proxy, checkFn); err != nil {
 		t.Error(err)
 	}
 }
 
-func initForStateTest(c electionContext) {
+func initForStateTest(t *testing.T, c electionContext) {
 	addr := common.BytesToAddress([]byte{111})
 	proxy := common.BytesToAddress([]byte{10})
 	proxy1 := common.BytesToAddress([]byte{50})
@@ -1320,21 +1489,48 @@ func initForStateTest(c electionContext) {
 	}
 
 	c.context.GetStateDb().AddBalance(addr, big.NewInt(0).Mul(big.NewInt(10), big.NewInt(1e18)))
-	c.stake(addr, big.NewInt(10))
+	if err := c.stake(addr, vnt2wei(10)); err != nil {
+		t.Errorf("stake error, addr: %s, error: %s", addr.String(), err)
+	}
 	c.context.GetStateDb().AddBalance(proxy, big.NewInt(0).Mul(big.NewInt(100), big.NewInt(1e18)))
-	c.stake(proxy, big.NewInt(100))
+	if err := c.stake(proxy, vnt2wei(100)); err != nil {
+		t.Errorf("stake error, addr: %s, error: %s", proxy.String(), err)
+	}
 	c.context.GetStateDb().AddBalance(proxy1, big.NewInt(0).Mul(big.NewInt(1000), big.NewInt(1e18)))
-	c.stake(proxy1, big.NewInt(1000))
-	c.startProxy(proxy)
-	c.startProxy(proxy1)
-	c.voteWitnesses(proxy1, candidates)
+	if err := c.stake(proxy1, vnt2wei(1000)); err != nil {
+		t.Errorf("stake error, addr: %s, error: %s", proxy1.String(), err)
+	}
+	if err := c.startProxy(proxy); err != nil {
+		t.Errorf("start proxy, addr: %s, error: %s", proxy.String(), err)
+	}
+	if err := c.startProxy(proxy1); err != nil {
+		t.Errorf("start proxy, addr: %s, error: %s", proxy1.String(), err)
+	}
+	if err := c.voteWitnesses(proxy1, candidates); err != nil {
+		t.Errorf("vote, addr: %s, error: %s", proxy1.String(), err)
+	}
 
 	// 下面只是为了把addr塞进数据库
-	c.startProxy(addr)
-	c.stopProxy(addr)
+	if err := c.startProxy(addr); err != nil {
+		t.Errorf("start proxy, addr: %s, error: %s", addr.String(), err)
+	}
+	if err := c.stopProxy(addr); err != nil {
+		t.Errorf("start proxy, addr: %s, error: %s", addr.String(), err)
+	}
 
-	for _, candi := range candidates {
-		c.registerWitness(candi, url)
+	for i, candi := range candidates {
+		website := "www.testnet.info" + strconv.Itoa(i)
+		name := "testinfo" + strconv.Itoa(i)
+		p2pUrl := []byte(string(url)[:13] + strconv.Itoa(i) + string(url)[14:])
+		info := &NodeInfo{p2pUrl, []byte(website), []byte(name), binder, beneficiary}
+		if err := c.registerWitness(candi, info); err != nil {
+			t.Errorf("register failed, addr: %s, error: %s", candi.String(), err)
+		}
+
+		// 把候选人设置为已绑定
+		ca := c.getCandidate(candi)
+		ca.Bind = true
+		c.setCandidate(ca)
 	}
 }
 
@@ -1381,54 +1577,6 @@ func checkState(c electionContext, address common.Address) byte {
 	return result
 }
 
-// For All test
-// 定义6个账户(复杂度为指数级，定义账户过多运行时间过长)，账户地址50-55。其中
-// 2个账户为一般用户，它们可以投票、取消投票、设置代理、取消代理。
-// 2个账户为代理账户(方便出现类似多级代理的情况)，它们比一般账户多了开始代理和停止代理两个操作。
-// 1个账户为候选账户，它们只有注册成为见证人和注销见证人两个操作。
-// 1个账户为全能账户，它们可以进行所有的操作。
-var alreadySetForAllStateTest map[[6]byte]struct{}
-var operatesForAllStateTest = []string{
-	"voteWitnesses",
-	"cancelVote",
-	"setProxy",
-	"cancelProxy",
-	"startProxy",
-	"stopProxy",
-	"registerWitness",
-	"unregisterWitness",
-}
-
-// 检查并返回所有20个账户的当前状态
-// 状态有6个指标
-// 是否是候选人
-// 是否有抵押
-// 是否有投票
-// 是否是代理
-// 是否有代理
-// 是否有代理投票
-func checkAllState(c electionContext) [6]byte {
-	var result [6]byte
-	var resultByte byte
-	for i := 0; i < 6; i++ {
-		addr := common.BytesToAddress([]byte{byte(i + 50)})
-		resultByte = 0
-
-		//// 是否是候选人
-		if i > 3 {
-			candidate := c.getCandidate(addr)
-			if bytes.Equal(candidate.Owner.Bytes(), addr.Bytes()) {
-				if candidate.Active {
-					resultByte |= 1 << 4
-				}
-			}
-		}
-		resultByte |= checkState(c, addr)
-		result[i] = resultByte
-	}
-	return result
-}
-
 func operate(c electionContext, op string, address common.Address, proxy common.Address, candidates []common.Address) error {
 	var err error
 	switch op {
@@ -1453,7 +1601,10 @@ func operate(c electionContext, op string, address common.Address, proxy common.
 	case "stopProxy":
 		err = c.stopProxy(address)
 	case "registerWitness":
-		err = c.registerWitness(address, url)
+		website := "www.testnet.info"
+		name := "testinfo"
+		info := &NodeInfo{url, []byte(website), []byte(name), binder, beneficiary}
+		err = c.registerWitness(address, info)
 	case "unregisterWitness":
 		err = c.unregisterWitness(address)
 	default:
@@ -1462,106 +1613,235 @@ func operate(c electionContext, op string, address common.Address, proxy common.
 	return err
 }
 
-func dfsAllState(c electionContext) error {
-	// 进入时保存当前数据库状态，退出时恢复
-	snap := c.context.GetStateDb().Snapshot()
-	defer c.context.GetStateDb().RevertToSnapshot(snap)
-	// 迭代产生address
-	for i := 50; i < 56; i++ {
-		address := common.BytesToAddress([]byte{byte(i)})
-		// 迭代产生proxy
-		for j := 52; j < 56; j++ {
-			if j == 54 {
-				continue
-			}
-			proxy := common.BytesToAddress([]byte{byte(j)})
-			// 迭代产生candidates
-			candis := []common.Address{
-				common.BytesToAddress([]byte{byte(54)}),
-				common.BytesToAddress([]byte{byte(55)}),
-			}
-
-			// 迭代各种操作
-			for idx, op := range operatesForAllStateTest {
-				// 一般账号，没有后面4个操作
-				if (i == 50 || i == 51) && idx > 3 {
-					continue
-				} else if (i == 52 || i == 53) && idx > 5 { // 代理账号，没有后面2个操作
-					continue
-				} else if (i == 54) && (idx < 6) { // 候选人账号，只有两个操作
-					continue
-				}
-				snap1 := c.context.GetStateDb().Snapshot()
-				time1 := new(big.Int).Set(c.context.GetTime())
-				err := operate(c, op, address, proxy, candis)
-
-				if err == nil {
-					if _, err = checkValid(c); err != nil {
-						fmt.Println(err)
-						return err
-					}
-					nextState := checkAllState(c)
-					// 如果是新的状态加入到队列中
-					if _, ok := alreadySetForAllStateTest[nextState]; !ok {
-						alreadySetForAllStateTest[nextState] = struct{}{}
-						err = dfsAllState(c)
-						if err != nil {
-							return err
-						}
-					}
-				}
-				c.context.GetStateDb().RevertToSnapshot(snap1)
-				if ctx, ok := c.context.(*testContext); ok {
-					ctx.SetTime(time1)
-				}
-			}
-
-		}
-	}
-	return nil
+type bindCase struct {
+	name      string // case name
+	binder    common.Address
+	info      *BindInfo
+	amount    *big.Int   // unbind时忽略此字段
+	bindErr   error      // 也可以是unbind操作的结果
+	preCandi  *Candidate // bind前的candidate信息
+	wantCandi *Candidate
 }
 
-func TestAllState(t *testing.T) {
-	context := newcontext()
-	c := newElectionContext(context)
-	for i := 50; i < 56; i++ {
-		addr := common.BytesToAddress([]byte{byte(i)})
-		c.context.GetStateDb().AddBalance(addr, big.NewInt(1).Mul(big.NewInt(int64(i)), big.NewInt(1e18)))
-		c.stake(addr, big.NewInt(int64(i)))
-		if i >= 54 {
-			c.registerWitness(addr, url)
+// 所有绑定候选人的测试用例
+func TestBindCandidate(t *testing.T) {
+	ca := newTestCandi()
+	// 绑定金额不为1000，返回错误ErrLockAmountMismatch
+	c1 := bindCase{"c1", ca.Binder, newTestBindInfo(ca), big.NewInt(999), ErrLockAmountMismatch, nil, nil}
+	c2 := bindCase{"c2", ca.Binder, newTestBindInfo(ca), big.NewInt(1001), ErrLockAmountMismatch, nil, nil}
+
+	// 未注册，返回错误未找到candidate
+	c3 := bindCase{"c3", ca.Binder, newTestBindInfo(ca), bindAmount, fmt.Errorf("bindCandidates failed, candidates not exist: %s", ca.Owner.Hex()), nil, nil}
+
+	// 注册，取消注册，返回ErrCandiNotReg
+	ca4 := newTestCandi()
+	ca4.Registered = false
+	ca4.Bind = false
+	c4 := bindCase{"c4", ca4.Binder, newTestBindInfo(ca4), bindAmount, ErrCandiNotReg, ca4, ca4}
+
+	// 已注册，绑定人不一致，返回错误ErrBindInfoMismatch
+	ca5 := newTestCandi()
+	ca5.Registered = true
+	c5 := bindCase{"c5", common.HexToAddress("0x000000012321"), newTestBindInfo(ca5), bindAmount, ErrBindInfoMismatch, ca5, ca5}
+
+	// 已注册，受益人不一致，返回错误ErrBindInfoMismatch
+	ca6 := newTestCandi()
+	ca6.Registered = true
+	info := newTestBindInfo(ca6)
+	info.Beneficiary = common.HexToAddress("0x0000000123")
+	c6 := bindCase{"c6", ca6.Binder, info, bindAmount, ErrBindInfoMismatch, ca6, ca6}
+
+	// 已注册，已绑定，返回错误 ErrCandiAlreadyBind
+	ca7 := newTestCandi()
+	ca7.Registered = true
+	ca7.Bind = true
+	c7 := bindCase{"c7", ca7.Binder, newTestBindInfo(ca7), bindAmount, ErrCandiAlreadyBind, ca7, ca7}
+
+	// 已注册，未绑定，绑定成功，返回错误为nil
+	ca8 := newTestCandi()
+	ca8.Registered = true
+	ca8.Bind = false
+	ca8Exp := newTestCandi()
+	ca8Exp.Registered = true
+	ca8Exp.Bind = true
+	c8 := bindCase{"c8", ca8.Binder, newTestBindInfo(ca8), bindAmount, nil, ca8, ca8Exp}
+	cases := []bindCase{c1, c2, c3, c4, c5, c6, c7, c8}
+	for _, c := range cases {
+		testBindCandidate(t, &c)
+	}
+}
+
+func testBindCandidate(t *testing.T, cas *bindCase) {
+	ec := newTestElectionCtx()
+
+	// 先填充见证人信息
+	if cas.preCandi != nil {
+		if err := ec.setCandidate(*cas.preCandi); err != nil {
+			t.Errorf("set andiates: %s, error: %s", cas.preCandi.Owner, err)
 		}
 	}
-	alreadySetForAllStateTest = make(map[[6]byte]struct{})
-	var start [6]byte
-	start[4] = 16
-	start[5] = 16
-	alreadySetForAllStateTest[start] = struct{}{}
-	err := dfsAllState(c)
-	if err != nil {
-		t.Error(err)
-	}
 
-	test := make(map[int]map[byte]struct{})
-	for i := 50; i < 56; i++ {
-		test[i] = make(map[byte]struct{})
-	}
+	// 绑定和校验结果
+	err := ec.bindCandidate(cas.binder, cas.info, cas.amount)
+	assert.Equal(t, err, cas.bindErr, fmt.Sprintf(", bind error, case: %v", cas.name))
 
-	for k := range alreadySetForAllStateTest {
-		for i := 0; i < 6; i++ {
-			test[50+i][k[i]] = struct{}{}
+	// 校验执行绑定后的数据
+	if cas.wantCandi != nil {
+		gotCandi := ec.getCandidate(cas.wantCandi.Owner)
+		assert.Equal(t, gotCandi.String(), (*cas.wantCandi).String(), fmt.Sprintf(", candidate mismtach after bind, case: %v", cas.name))
+	}
+}
+
+// 取消绑定的所有测试
+func TestUnbindCandidate(t *testing.T) {
+	// 未注册，返回错误未找到candidate
+	ca1 := newTestCandi()
+	c1 := bindCase{"c1", ca1.Binder, newTestBindInfo(ca1), bindAmount, fmt.Errorf("bindCandidates failed, candidates not exist: %s", ca1.Owner.Hex()), nil, nil}
+
+	// 注册，取消注册，返回或 ErrCandiNotReg
+	ca2 := newTestCandi()
+	ca2.Registered = false
+	ca2.Bind = false
+	c2 := bindCase{"c2", ca2.Binder, newTestBindInfo(ca2), bindAmount, ErrCandiNotReg, ca2, ca2}
+
+	// 未绑定，返回 ErrCandiNotBind
+	ca3 := newTestCandi()
+	ca3.Registered = true
+	ca3.Bind = false
+	c3 := bindCase{"c3", ca3.Binder, newTestBindInfo(ca3), bindAmount, ErrCandiNotBind, ca3, ca3}
+
+	// 已注册，已绑定，返回nil，绑定人多1000vnt
+	ca4 := newTestCandi()
+	ca4.Registered = true
+	ca4.Bind = true
+	ca4Exp := newTestCandi()
+	ca4Exp.Registered = true
+	ca4Exp.Bind = false
+	c4 := bindCase{"c4", ca4.Binder, newTestBindInfo(ca4), bindAmount, nil, ca4, ca4Exp}
+
+	cases := []bindCase{c1, c2, c3, c4}
+	for _, c := range cases {
+		testUnbindCandidate(t, &c)
+	}
+}
+
+func testUnbindCandidate(t *testing.T, cas *bindCase) {
+	ec := newTestElectionCtx()
+	// ec充1000VNT
+	ec.context.GetStateDb().AddBalance(contractAddr, bindAmount)
+
+	// 先填充见证人信息
+	if cas.preCandi != nil {
+		if err := ec.setCandidate(*cas.preCandi); err != nil {
+			t.Errorf("set andiates: %s, error: %s", cas.preCandi.Owner, err)
 		}
 	}
-	if len(test[50]) != 3 || len(test[51]) != 3 {
-		t.Errorf("the number of state for general account is : (%d, %d), expected: %d", len(test[50]), len(test[51]), 3)
+
+	// 绑定和校验结果
+	err := ec.unbindCandidate(cas.binder, cas.info)
+	assert.Equal(t, err, cas.bindErr, fmt.Sprintf(", bind error, case: %v", cas.name))
+
+	// 校验执行绑定后的数据
+	if cas.wantCandi != nil {
+		gotCandi := ec.getCandidate(cas.wantCandi.Owner)
+		assert.Equal(t, gotCandi, *cas.wantCandi, fmt.Sprintf(", candidate mismtach after unbind, case: %v", cas.name))
 	}
-	if len(test[52]) != 10 || len(test[53]) != 10 {
-		t.Errorf("the number of state for proxy account is : (%d, %d), expected: %d", len(test[52]), len(test[53]), 10)
+
+	// 检查绑定人余额多1000VNT
+	if cas.bindErr == nil {
+		assert.Equal(t, ec.context.GetStateDb().GetBalance(cas.binder), bindAmount, fmt.Sprintf(", balance of binder is wrong, case: %v", cas.name))
 	}
-	if len(test[54]) != 2 {
-		t.Errorf("the number of state for candidate account is : %d, expected: %d", len(test[54]), 2)
+}
+
+type unRegCase struct {
+	name         string // case name
+	retErr       error
+	preCandi     *Candidate // 操作前的candidate信息
+	wantCandi    *Candidate // 操作后期望的candidate信息
+	shouldReturn bool       // 是否要返还绑定金
+}
+
+// 取消注册
+func TestUnregisterCandidate(t *testing.T) {
+	// 已注册，未绑定，返回nil，绑定人金额不变
+	ca1 := newTestCandi()
+	ca1.Registered = true
+	ca1.Bind = false
+	ca1Exp := newTestCandi()
+	ca1Exp.Registered = false
+	ca1Exp.Bind = false
+	c1 := unRegCase{"c1", nil, ca1, ca1Exp, false}
+
+	// 已注册，已绑定，返回nil，绑定人金额多1000vnt
+	ca2 := newTestCandi()
+	ca2.Registered = true
+	ca2.Bind = true
+	ca2Exp := newTestCandi()
+	ca2Exp.Registered = false
+	ca2Exp.Bind = false
+	ca2Exp.Beneficiary = emptyAddress
+	ca2Exp.Binder = emptyAddress
+	c2 := unRegCase{"c2", nil, ca2, ca2Exp, true}
+
+	// 已注册后取消，再取消
+	ca3 := newTestCandi()
+	ca3.Registered = false
+	ca3.Bind = false
+	c3 := unRegCase{"c3", ErrCandiNotReg, ca3, ca3, false}
+
+	cases := []unRegCase{c1, c2, c3}
+	for _, c := range cases {
+		testUnregisterCandidate(t, &c)
 	}
-	if len(test[55]) != 20 {
-		t.Errorf("the number of state for super account is : %d, expected: %d", len(test[55]), 20)
+}
+
+func testUnregisterCandidate(t *testing.T, cas *unRegCase) {
+	ec := newTestElectionCtx()
+	// ec充1000VNT
+	ec.context.GetStateDb().AddBalance(contractAddr, bindAmount)
+
+	// 先填充见证人信息
+	if cas.preCandi != nil {
+		if err := ec.setCandidate(*cas.preCandi); err != nil {
+			t.Errorf("set andiates: %s, error: %s", cas.preCandi.Owner, err)
+		}
 	}
+
+	// 校验结果
+	err := ec.unregisterWitness(cas.preCandi.Owner)
+	assert.Equal(t, err, cas.retErr, fmt.Sprintf(", unregesiter error, case: %v", cas.name))
+
+	// 校验操作后的候选人
+	if cas.wantCandi != nil {
+		gotCandi := ec.getCandidate(cas.wantCandi.Owner)
+		assert.Equal(t, gotCandi.String(), (*cas.wantCandi).String(), fmt.Sprintf(", candidate mismtach after unbind, case: %v", cas.name))
+	}
+
+	// 检查绑定人余额多1000VNT
+	if cas.shouldReturn {
+		assert.Equal(t, ec.context.GetStateDb().GetBalance(cas.preCandi.Binder), bindAmount, fmt.Sprintf(", balance of binder is wrong, case: %v", cas.name))
+	}
+}
+
+func newTestElectionCtx() electionContext {
+	ctx := newcontext()
+	return newElectionContext(ctx)
+}
+
+func newTestCandi() *Candidate {
+	return &Candidate{
+		Owner:       common.HexToAddress("9ee97d274eb4c215f23238fee1f103d9ea10a234"),
+		Binder:      binder,
+		Beneficiary: beneficiary,
+		Registered:  true,
+		Bind:        true,
+		VoteCount:   big.NewInt(0),
+		Url:         []byte("/ip4/192.168.9.102/tcp/5210/ipfs/1kHaMUmZgTpjGEhxcGATr1UVWy6iKkygFuknWEtW7LiLrev"),
+		Website:     []byte("www.testwebsite.net/test/witness/website"),
+		Name:        []byte("testNet"),
+	}
+}
+
+func newTestBindInfo(ca *Candidate) *BindInfo {
+	return &BindInfo{ca.Owner, ca.Beneficiary}
 }

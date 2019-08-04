@@ -1,14 +1,30 @@
+// Copyright 2019 The go-vnt Authors
+// This file is part of the go-vnt library.
+//
+// The go-vnt library is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// The go-vnt library is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU Lesser General Public License for more details.
+//
+// You should have received a copy of the GNU Lesser General Public License
+// along with the go-vnt library. If not, see <http://www.gnu.org/licenses/>.
+
 package election
 
 import (
+	"bytes"
+	"encoding/binary"
 	"fmt"
 	"math/big"
 	"reflect"
 
-	"bytes"
-	"encoding/binary"
 	"github.com/vntchain/go-vnt/common"
-	"github.com/vntchain/go-vnt/core/vm/interface"
+	inter "github.com/vntchain/go-vnt/core/vm/interface"
 	"github.com/vntchain/go-vnt/log"
 	"github.com/vntchain/go-vnt/rlp"
 )
@@ -17,9 +33,12 @@ const (
 	VOTERPREFIX     = byte(0)
 	CANDIDATEPREFIX = byte(1)
 	STAKEPREFIX     = byte(2)
-	BOUNTYPREFIX    = byte(3)
+	REWARDPREFIX    = byte(3)
 	PREFIXLENGTH    = 4 // key的结构为，4位表前缀，20位address，8位的value在struct中的位置
 )
+
+type getFuncType func(key common.Hash) common.Hash
+type setFuncType func(key common.Hash, value common.Hash)
 
 func (ec electionContext) getVoter(addr common.Address) Voter {
 	return getVoterFrom(addr, ec.getFromDB)
@@ -66,38 +85,52 @@ func (ec electionContext) setStake(stake Stake) error {
 }
 
 func (ec electionContext) setToDB(key common.Hash, value common.Hash) {
-	ec.context.GetStateDb().SetState(electionAddr, key, value)
+	ec.context.GetStateDb().SetState(contractAddr, key, value)
 }
 
 func (ec electionContext) getFromDB(key common.Hash) common.Hash {
-	return ec.context.GetStateDb().GetState(electionAddr, key)
+	return ec.context.GetStateDb().GetState(contractAddr, key)
 }
 
 // getVoterFrom get a voter's information from a specific stateDB
-func getVoterFrom(addr common.Address, getFromDB func(key common.Hash) common.Hash) Voter {
+func getVoterFrom(addr common.Address, getFromDB getFuncType) Voter {
 	var voter Voter
 	var err error
-	if err := convertToStruct(VOTERPREFIX, addr, &voter, getFromDB); err == nil {
+	if err = convertToStruct(VOTERPREFIX, addr, &voter, getFromDB); err == nil {
 		return voter
 	}
 
-	log.Debug("Get Voter From DB ", "addr", addr.String(), "err", err)
+	log.Debug("Get voter from DB ", "addr", addr.String(), "err", err)
 	return newVoter()
 }
 
+// getCandidateFrom get a candidate's information from a specific stateDB
+func getCandidateFrom(addr common.Address, getFromDB getFuncType) Candidate {
+	var (
+		ca  Candidate
+		err error
+	)
+	if err = convertToStruct(CANDIDATEPREFIX, addr, &ca, getFromDB); err == nil {
+		return ca
+	}
+
+	log.Debug("Get candidate from DB ", "addr", addr.String(), "err", err)
+	return newCandidate()
+}
+
 // getStakeFrom get a user's information from a specific stateDB
-func getStakeFrom(addr common.Address, getFromDB func(key common.Hash) common.Hash) Stake {
+func getStakeFrom(addr common.Address, getFromDB getFuncType) Stake {
 	var stake Stake
 	var err error
-	if err := convertToStruct(STAKEPREFIX, addr, &stake, getFromDB); err == nil {
+	if err = convertToStruct(STAKEPREFIX, addr, &stake, getFromDB); err == nil {
 		return stake
 	}
 
-	log.Debug("Get Stake From DB ", "addr", addr.String(), "err", err)
+	log.Debug("Get stake from DB ", "addr", addr.String(), "err", err)
 	return Stake{}
 }
 
-func convertToKV(prefix byte, v interface{}, fn func(key common.Hash, value common.Hash)) error {
+func convertToKV(prefix byte, v interface{}, setToDB setFuncType) error {
 	var key common.Hash
 	key[0] = prefix
 
@@ -121,7 +154,7 @@ func convertToKV(prefix byte, v interface{}, fn func(key common.Hash, value comm
 			return fmt.Errorf("error: owner %v is not address", owner)
 		}
 	} else {
-		copy(key[PREFIXLENGTH:], electionAddr.Bytes())
+		copy(key[PREFIXLENGTH:], contractAddr.Bytes())
 	}
 
 	// 结构体中的每个元素都要分别存储
@@ -147,7 +180,7 @@ func convertToKV(prefix byte, v interface{}, fn func(key common.Hash, value comm
 				if err != nil {
 					return err
 				}
-				fn(subKey, common.BytesToHash(elem))
+				setToDB(subKey, common.BytesToHash(elem))
 			}
 		}
 		// 如果是数组，则数组开始的key，存储数组的长度
@@ -156,7 +189,7 @@ func convertToKV(prefix byte, v interface{}, fn func(key common.Hash, value comm
 			if err != nil {
 				return err
 			}
-			fn(key, common.BytesToHash(elem))
+			setToDB(key, common.BytesToHash(elem))
 			continue
 		}
 
@@ -172,34 +205,25 @@ func convertToKV(prefix byte, v interface{}, fn func(key common.Hash, value comm
 		// 如果要存储的字节过长，就拆分了存
 		// 0号位置存储切分的长度，后面按右对齐方式存储，若需要补空位，补在第一个元素处
 		valLen := len(elem)/32 + 1
-		if valLen > 1 {
-			lenByte, err := rlp.EncodeToBytes(uint32(valLen))
-			if err != nil {
-				return err
+		var j int
+		for j = valLen - 1; j >= 0; j-- {
+			var subKey common.Hash
+			copy(subKey[:], key[:])
+			binary.BigEndian.PutUint32(subKey[PREFIXLENGTH+common.AddressLength:], uint32(j))
+			cutPos := len(elem) - 32
+			if cutPos < 0 {
+				setToDB(subKey, common.BytesToHash(elem))
+				break
 			}
-			fn(key, common.BytesToHash(lenByte))
-			var j int
-			for j = valLen; j > 0; j-- {
-				var subKey common.Hash
-				copy(subKey[:], key[:])
-				binary.BigEndian.PutUint32(subKey[PREFIXLENGTH+common.AddressLength:], uint32(j))
-				cutPos := len(elem) - 32
-				if cutPos < 0 {
-					fn(subKey, common.BytesToHash(elem))
-					break
-				}
-				tmpElem := elem[cutPos:]
-				elem = elem[:cutPos]
-				fn(subKey, common.BytesToHash(tmpElem))
-			}
-		} else {
-			fn(key, common.BytesToHash(elem))
+			tmpElem := elem[cutPos:]
+			elem = elem[:cutPos]
+			setToDB(subKey, common.BytesToHash(tmpElem))
 		}
 	}
 	return nil
 }
 
-func convertToStruct(prefix byte, addr common.Address, v interface{}, getFn func(key common.Hash) common.Hash) error {
+func convertToStruct(prefix byte, addr common.Address, v interface{}, getFn getFuncType) error {
 	value := reflect.ValueOf(v)
 	if value.Kind() != reflect.Ptr {
 		return fmt.Errorf("error : v %v must be ptr", v)
@@ -273,33 +297,25 @@ func convertToStruct(prefix byte, addr common.Address, v interface{}, getFn func
 			}
 		} else if _, ok := fv.Interface().([]byte); ok {
 			// 部分byte数组过长，是拆分了之后存储的
-			var valLen uint32
-			if err := rlp.DecodeBytes(valByte.Big().Bytes(), &valLen); err == nil {
-				if valLen == 0 {
-					break
-				}
-				var longByte []byte
-				for j := valLen; j > 1; j-- {
+			var val []byte
+			err := rlp.DecodeBytes(valByte.Big().Bytes(), &val)
+			if err == nil {
+				value.Field(i).Set(reflect.ValueOf(val))
+			} else {
+				val = valByte.Big().Bytes()
+				var tmp []byte
+				for j := 1; ; j++ {
 					binary.BigEndian.PutUint32(key[PREFIXLENGTH+common.AddressLength:], uint32(j))
 					arrayByte := getFn(key)
-					longByte = append(arrayByte.Bytes(), longByte...)
+					if arrayByte.Big().Sign() == 0 {
+						break
+					}
+					val = append(val, arrayByte.Bytes()...)
+					if err = rlp.DecodeBytes(val, &tmp); err == nil {
+						value.Field(i).Set(reflect.ValueOf(tmp))
+						break
+					}
 				}
-				if valLen > 0 {
-					binary.BigEndian.PutUint32(key[PREFIXLENGTH+common.AddressLength:], uint32(1))
-					arrayByte := getFn(key)
-					longByte = append(arrayByte.Big().Bytes(), longByte...)
-				}
-				var tmp []byte
-				if err = rlp.DecodeBytes(longByte, &tmp); err != nil {
-					return fmt.Errorf("decode %x to []byte error: %v", longByte, err)
-				}
-				value.Field(i).Set(reflect.ValueOf(tmp))
-			} else {
-				var tmp []byte
-				if err = rlp.DecodeBytes(valByte.Big().Bytes(), &tmp); err != nil {
-					return fmt.Errorf("decode %x to []byte error: %v", valByte, err)
-				}
-				value.Field(i).Set(reflect.ValueOf(tmp))
 			}
 		}
 
@@ -311,7 +327,7 @@ func getAllCandidate(db inter.StateDB) CandidateList {
 	var result CandidateList
 	addrs := make(map[common.Address]struct{})
 	// 从数据库的value中找到所有的address
-	db.ForEachStorage(electionAddr, func(key common.Hash, value common.Hash) bool {
+	db.ForEachStorage(contractAddr, func(key common.Hash, value common.Hash) bool {
 		_, content, _, err := rlp.Split(value.Big().Bytes())
 		if err != nil {
 			// 这个地方长的bytes做过处理这里split会出错，所以这个错改成debug打印日志
@@ -332,16 +348,14 @@ func getAllCandidate(db inter.StateDB) CandidateList {
 		return true
 	})
 
-	getFn := func(key common.Hash) common.Hash {
-		return db.GetState(electionAddr, key)
-	}
 	// 用这些address尝试去数据库中找候选者，当没有这个地址的候选者时会报错
+	// 有可能并不是见证人所以报错
 	for addr := range addrs {
 		// var candidate Candidate
 		candidate := newCandidate()
-		err := convertToStruct(CANDIDATEPREFIX, addr, &candidate, getFn)
+		err := convertToStruct(CANDIDATEPREFIX, addr, &candidate, genGetFunc(db))
 		if err != nil {
-			log.Error("getAllCandidate error", "address", addr, "err", err)
+			log.Debug("getAllCandidate maybe error", "address", addr, "err", err)
 			continue
 		}
 		result = append(result, candidate)
@@ -354,7 +368,7 @@ func getAllProxy(db inter.StateDB) []*Voter {
 	var result []*Voter
 	addrs := make(map[common.Address]struct{})
 
-	db.ForEachStorage(electionAddr, func(key common.Hash, value common.Hash) bool {
+	db.ForEachStorage(contractAddr, func(key common.Hash, value common.Hash) bool {
 		if key[0] == VOTERPREFIX {
 			var addr common.Address
 			copy(addr[:], key[PREFIXLENGTH:PREFIXLENGTH+common.AddressLength])
@@ -363,13 +377,9 @@ func getAllProxy(db inter.StateDB) []*Voter {
 		return true
 	})
 
-	getFn := func(key common.Hash) common.Hash {
-		return db.GetState(electionAddr, key)
-	}
-
 	for addr := range addrs {
 		var voter Voter
-		err := convertToStruct(VOTERPREFIX, addr, &voter, getFn)
+		err := convertToStruct(VOTERPREFIX, addr, &voter, genGetFunc(db))
 		if err != nil {
 			log.Error("getAllProxy error", "address", addr, "err", err)
 		}
@@ -380,46 +390,30 @@ func getAllProxy(db inter.StateDB) []*Voter {
 	}
 	return result
 }
-func addCandidateBounty(stateDB inter.StateDB, addr common.Address, bouns *big.Int) error {
-	getFn := func(key common.Hash) common.Hash {
-		return stateDB.GetState(electionAddr, key)
-	}
-	candidate := newCandidate()
-	err := convertToStruct(CANDIDATEPREFIX, addr, &candidate, getFn)
-	if err != nil {
-		return err
-	}
 
-	setFn := func(key common.Hash, value common.Hash) {
-		stateDB.SetState(electionAddr, key, value)
-	}
-	candidate.TotalBounty = new(big.Int).Add(candidate.TotalBounty, bouns)
-	err = convertToKV(CANDIDATEPREFIX, &candidate, setFn)
+func getReward(stateDB inter.StateDB) Reward {
+	var re Reward
+	err := convertToStruct(REWARDPREFIX, contractAddr, &re, genGetFunc(stateDB))
 	if err != nil {
-		return err
+		return Reward{big.NewInt(0)}
 	}
-	return nil
+	return re
 }
 
-func getRestBounty(stateDB inter.StateDB) Bounty {
-	getFn := func(key common.Hash) common.Hash {
-		return stateDB.GetState(electionAddr, key)
-	}
-	var bounty Bounty
-	err := convertToStruct(BOUNTYPREFIX, electionAddr, &bounty, getFn)
-	if err != nil {
-		return Bounty{big.NewInt(0)}
-	}
-	return bounty
+func setReward(stateDB inter.StateDB, restBounty Reward) error {
+	return convertToKV(REWARDPREFIX, restBounty, genSetFunc(stateDB))
 }
 
-func setRestBounty(stateDB inter.StateDB, restBounty Bounty) error {
-	setFn := func(key common.Hash, value common.Hash) {
-		stateDB.SetState(electionAddr, key, value)
+// genGetFunc generate universal get function for read from state db.
+func genGetFunc(stateDb inter.StateDB) getFuncType {
+	return func(key common.Hash) common.Hash {
+		return stateDb.GetState(contractAddr, key)
 	}
-	err := convertToKV(BOUNTYPREFIX, restBounty, setFn)
-	if err != nil {
-		return err
+}
+
+// genSetFunc generate universal get function for write state to state db.
+func genSetFunc(stateDb inter.StateDB) setFuncType {
+	return func(key common.Hash, value common.Hash) {
+		stateDb.SetState(contractAddr, key, value)
 	}
-	return nil
 }

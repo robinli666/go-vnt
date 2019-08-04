@@ -38,8 +38,9 @@ type signer struct {
 	sign bind.SignerFn
 }
 
-func (s *signer) Sign(addr *Address, unsignedTx *Transaction) (signedTx *Transaction, _ error) {
-	sig, err := s.sign(types.HomesteadSigner{}, addr.address, unsignedTx.tx)
+func (s *signer) Sign(addr *Address, unsignedTx *Transaction, chainID *big.Int) (signedTx *Transaction, _ error) {
+	si := types.NewHubbleSigner(chainID)
+	sig, err := s.sign(si, addr.address, unsignedTx.tx)
 	if err != nil {
 		return nil, err
 	}
@@ -78,6 +79,7 @@ func (opts *TransactOpts) GetNonce() int64      { return opts.opts.Nonce.Int64()
 func (opts *TransactOpts) GetValue() *BigInt    { return &BigInt{opts.opts.Value} }
 func (opts *TransactOpts) GetGasPrice() *BigInt { return &BigInt{opts.opts.GasPrice} }
 func (opts *TransactOpts) GetGasLimit() int64   { return int64(opts.opts.GasLimit) }
+func (opts *TransactOpts) GetChainID() *BigInt  { return &BigInt{opts.opts.ChainID} }
 
 // GetSigner cannot be reliably implemented without identity preservation (https://github.com/golang/go/issues/16876)
 // func (opts *TransactOpts) GetSigner() Signer { return &signer{opts.opts.Signer} }
@@ -101,6 +103,7 @@ func (opts *TransactOpts) SetValue(value *BigInt)      { opts.opts.Value = value
 func (opts *TransactOpts) SetGasPrice(price *BigInt)   { opts.opts.GasPrice = price.bigint }
 func (opts *TransactOpts) SetGasLimit(limit int64)     { opts.opts.GasLimit = uint64(limit) }
 func (opts *TransactOpts) SetContext(context *Context) { opts.opts.Context = context.context }
+func (opts *TransactOpts) SetChainID(chainID *BigInt)  { opts.opts.ChainID = chainID.bigint }
 
 // BoundContract is the base wrapper object that reflects a contract on the
 // VNT network. It contains a collection of methods that are used by the

@@ -63,13 +63,6 @@ var (
 		utils.BootnodesV5Flag,
 		utils.DataDirFlag,
 		utils.KeyStoreDirFlag,
-		utils.NoUSBFlag,
-		// utils.EthashCacheDirFlag,
-		// utils.EthashCachesInMemoryFlag,
-		// utils.EthashCachesOnDiskFlag,
-		// utils.EthashDatasetDirFlag,
-		// utils.EthashDatasetsInMemoryFlag,
-		// utils.EthashDatasetsOnDiskFlag,
 		utils.TxPoolNoLocalsFlag,
 		utils.TxPoolJournalFlag,
 		utils.TxPoolRejournalFlag,
@@ -80,8 +73,6 @@ var (
 		utils.TxPoolAccountQueueFlag,
 		utils.TxPoolGlobalQueueFlag,
 		utils.TxPoolLifetimeFlag,
-		utils.FastSyncFlag,
-		utils.LightModeFlag,
 		utils.SyncModeFlag,
 		utils.GCModeFlag,
 		utils.LightServFlag,
@@ -94,10 +85,9 @@ var (
 		utils.ListenPortFlag,
 		utils.MaxPeersFlag,
 		utils.MaxPendingPeersFlag,
-		utils.EtherbaseFlag,
+		utils.CoinbaseFlag,
 		utils.GasPriceFlag,
-		utils.MinerThreadsFlag,
-		utils.MiningEnabledFlag,
+		utils.ProducingEnabledFlag,
 		utils.TargetGasLimitFlag,
 		utils.NATFlag,
 		utils.NoDiscoverFlag,
@@ -105,15 +95,11 @@ var (
 		utils.NetrestrictFlag,
 		utils.NodeKeyFileFlag,
 		utils.NodeKeyHexFlag,
-		utils.DeveloperFlag,
-		utils.DeveloperPeriodFlag,
-		utils.TestnetFlag,
-		utils.RinkebyFlag,
 		utils.VMEnableDebugFlag,
 		utils.NetworkIdFlag,
 		utils.RPCCORSDomainFlag,
 		utils.RPCVirtualHostsFlag,
-		utils.EthStatsURLFlag,
+		utils.VntStatsURLFlag,
 		utils.MetricsEnabledFlag,
 		utils.NoCompactionFlag,
 		utils.GpoBlocksFlag,
@@ -162,7 +148,6 @@ func init() {
 		monitorCommand,
 		// See accountcmd.go:
 		accountCommand,
-		walletCommand,
 		// See consolecmd.go:
 		consoleCommand,
 		attachCommand,
@@ -229,13 +214,12 @@ func main() {
 // blocking mode, waiting for it to be shut down.
 func gvnt(ctx *cli.Context) error {
 	node := makeFullNode(ctx)
-	// go startVNTNode(node) //yhx
+	// go startVNTNode(node)
 	startNode(ctx, node)
 	node.Wait()
 	return nil
 }
 
-// yhx
 /* func startVNTNode(stack *node.Node) {
 	findnode := stack.Config().P2P.FindNode
 	bootnode := stack.Config().P2P.VNTBootnode
@@ -293,7 +277,6 @@ func gvnt(ctx *cli.Context) error {
 	select {}
 } */
 
-// yhx
 /* func findNode(ctx context.Context, findnode string, vdht *dht.IpfsDHT) {
 	_, findnodeID, err := vntp2p.GetAddr(findnode)
 	if err != nil {
@@ -309,7 +292,6 @@ func gvnt(ctx *cli.Context) error {
 	log.Info("findNode()", "find peerid SUCCESS with info", targetPeerInfo)
 } */
 
-// yhx
 /* func sayHelloToBootnode(ctx context.Context, host p2phost.Host, nodeID peer.ID) {
 	s, err := host.NewStream(ctx, nodeID, vntp2p.PID)
 	if err != nil {
@@ -338,7 +320,7 @@ func gvnt(ctx *cli.Context) error {
 
 // startNode boots up the system node and all registered protocols, after which
 // it unlocks any requested accounts, and starts the RPC/IPC interfaces and the
-// miner.
+// producer.
 func startNode(ctx *cli.Context, stack *node.Node) {
 	debug.Memsize.Add("node", stack)
 
@@ -396,28 +378,20 @@ func startNode(ctx *cli.Context, stack *node.Node) {
 		}
 	}()
 	// Start auxiliary services if enabled
-	if ctx.GlobalBool(utils.MiningEnabledFlag.Name) || ctx.GlobalBool(utils.DeveloperFlag.Name) {
-		// Mining only makes sense if a full VNT node is running
-		if ctx.GlobalBool(utils.LightModeFlag.Name) || ctx.GlobalString(utils.SyncModeFlag.Name) == "light" {
-			utils.Fatalf("Light clients do not support mining")
+	if ctx.GlobalBool(utils.ProducingEnabledFlag.Name) {
+		// Producing only makes sense if a full VNT node is running
+		if ctx.GlobalString(utils.SyncModeFlag.Name) == "light" {
+			utils.Fatalf("Light clients do not support block producing")
 		}
 		var vnt *vnt.VNT
 		if err := stack.Service(&vnt); err != nil {
 			utils.Fatalf("VNT service not running: %v", err)
 		}
-		// Use a reduced number of threads if requested
-		if threads := ctx.GlobalInt(utils.MinerThreadsFlag.Name); threads > 0 {
-			type threaded interface {
-				SetThreads(threads int)
-			}
-			if th, ok := vnt.Engine().(threaded); ok {
-				th.SetThreads(threads)
-			}
-		}
-		// Set the gas price to the limits from the CLI and start mining
+
+		// Set the gas price to the limits from the CLI and start producing
 		vnt.TxPool().SetGasPrice(utils.GlobalBig(ctx, utils.GasPriceFlag.Name))
-		if err := vnt.StartMining(true); err != nil {
-			utils.Fatalf("Failed to start mining: %v", err)
+		if err := vnt.StartProducing(true); err != nil {
+			utils.Fatalf("Failed to start block producing: %v", err)
 		}
 	}
 }

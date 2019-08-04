@@ -30,6 +30,7 @@ import (
 	"github.com/vntchain/go-vnt/core"
 	"github.com/vntchain/go-vnt/internal/jsre"
 	"github.com/vntchain/go-vnt/node"
+	"github.com/vntchain/go-vnt/params"
 	"github.com/vntchain/go-vnt/vnt"
 	"github.com/vntchain/go-vnt/vntp2p"
 )
@@ -98,14 +99,14 @@ func newTester(t *testing.T, confOverride func(*vnt.Config)) *tester {
 	if err != nil {
 		t.Fatalf("failed to create node: %v", err)
 	}
-	ethConf := &vnt.Config{
-		Genesis:   core.DeveloperGenesisBlock(15, common.Address{}),
-		Etherbase: common.HexToAddress(testAddress),
+	vntConf := &vnt.Config{
+		Genesis:  &core.Genesis{Config: params.TestChainConfig},
+		Coinbase: common.HexToAddress(testAddress),
 	}
 	if confOverride != nil {
-		confOverride(ethConf)
+		confOverride(vntConf)
 	}
-	if err = stack.Register(func(ctx *node.ServiceContext) (node.Service, error) { return vnt.New(ctx, ethConf, nil) }); err != nil {
+	if err = stack.Register(func(ctx *node.ServiceContext) (node.Service, error) { return vnt.New(ctx, vntConf, nil) }); err != nil {
 		t.Fatalf("failed to register VNT protocol: %v", err)
 	}
 	// Start the node and assemble the JavaScript console around it

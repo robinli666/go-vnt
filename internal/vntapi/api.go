@@ -19,7 +19,6 @@ package vntapi
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
@@ -36,6 +35,7 @@ import (
 	"github.com/vntchain/go-vnt/common/math"
 	"github.com/vntchain/go-vnt/core"
 	"github.com/vntchain/go-vnt/core/rawdb"
+	"github.com/vntchain/go-vnt/core/state"
 	"github.com/vntchain/go-vnt/core/types"
 	"github.com/vntchain/go-vnt/core/vm"
 	"github.com/vntchain/go-vnt/core/vm/election"
@@ -50,7 +50,7 @@ import (
 )
 
 const (
-	defaultGasPrice = 50 * params.Shannon
+	defaultGasPrice = 50 * params.Gwei
 )
 
 // PublicVntAPI provides an API to access VNT related information.
@@ -259,22 +259,6 @@ func (s *PrivateAccountAPI) ListWallets() []rawWallet {
 	return wallets
 }
 
-// OpenWallet initiates a hardware wallet opening procedure, establishing a USB
-// connection and attempting to authenticate via the provided passphrase. Note,
-// the method may return an extra challenge requiring a second open (e.g. the
-// Trezor PIN matrix challenge).
-func (s *PrivateAccountAPI) OpenWallet(url string, passphrase *string) error {
-	wallet, err := s.am.Wallet(url)
-	if err != nil {
-		return err
-	}
-	pass := ""
-	if passphrase != nil {
-		pass = *passphrase
-	}
-	return wallet.Open(pass)
-}
-
 // DeriveAccount requests a HD wallet to derive a new account, optionally pinning
 // it for later reuse.
 func (s *PrivateAccountAPI) DeriveAccount(url string, path string, pin *bool) (accounts.Account, error) {
@@ -356,10 +340,7 @@ func (s *PrivateAccountAPI) signTransaction(ctx context.Context, args SendTxArgs
 	// Assemble the transaction and sign with the wallet
 	tx := args.toTransaction()
 
-	var chainID *big.Int
-	if config := s.b.ChainConfig(); config.IsEIP155(s.b.CurrentBlock().Number()) {
-		chainID = config.ChainID
-	}
+	chainID := s.b.ChainConfig().ChainID
 	return wallet.SignTxWithPassphrase(account, passwd, tx, chainID)
 }
 
@@ -367,7 +348,6 @@ func (s *PrivateAccountAPI) signTransaction(ctx context.Context, args SendTxArgs
 // tries to sign it with the key associated with args.To. If the given passwd isn't
 // able to decrypt the key it fails.
 func (s *PrivateAccountAPI) SendTransaction(ctx context.Context, args SendTxArgs, passwd string) (common.Hash, error) {
-	log.Debug("api", "SendTransaction args", args, "password", passwd)
 	if args.Nonce == nil {
 		// Hold the addresse's mutex around signing to prevent concurrent assignment of
 		// the same nonce to multiple accounts.
@@ -412,7 +392,7 @@ func (s *PrivateAccountAPI) SignTransaction(ctx context.Context, args SendTxArgs
 // safely used to calculate a signature from.
 //
 // The hash is calulcated as
-//   keccak256("\x19Ethereum Signed Message:\n"${message length}${message}).
+//   keccak256("\x19Hubble Signed Message:\n"${message length}${message}).
 //
 // This gives context to the signed message and prevents signing of transactions.
 func signHash(data []byte) []byte {
@@ -421,7 +401,7 @@ func signHash(data []byte) []byte {
 }
 
 // Sign calculates an VNT ECDSA signature for:
-// keccack256("\x19Ethereum Signed Message:\n" + len(message) + message))
+// keccack256("\x19Hubble Signed Message:\n" + len(message) + message))
 //
 // Note, the produced signature conforms to the secp256k1 curve R, S and V values,
 // where the V value will be 27 or 28 for legacy reasons.
@@ -447,9 +427,9 @@ func (s *PrivateAccountAPI) Sign(ctx context.Context, data hexutil.Bytes, addr c
 }
 
 // EcRecover returns the address for the account that was used to create the signature.
-// Note, this function is compatible with eth_sign and personal_sign. As such it recovers
+// Note, this function is compatible with core_sign and personal_sign. As such it recovers
 // the address of:
-// hash = keccak256("\x19Ethereum Signed Message:\n"${message length}${message})
+// hash = keccak256("\x19Hubble Signed Message:\n"${message length}${message})
 // addr = ecrecover(hash, signature)
 //
 // Note, the signature must conform to the secp256k1 curve R, S and V values, where
@@ -539,19 +519,8 @@ func (s *PublicBlockChainAPI) GetCode(ctx context.Context, address common.Addres
 	if state == nil || err != nil {
 		return nil, err
 	}
-	code := state.GetCode(address)
-	wasmcode := wavm.WasmCode{}
-	decompress, err := utils.DeCompress(code)
-	if err != nil {
-		return nil, err
-	}
-	sep := []byte{0x7d} // 分割符'}',是{Code: "0x2da32be...", Abi: "0x23290da98acb032..."}的最后一位
-	sepIdx := bytes.Index(decompress, sep)
-
-	err = json.Unmarshal(decompress[:sepIdx+1], &wasmcode)
-	if err != nil {
-		return nil, err
-	}
+	compress := state.GetCode(address)
+	wasmcode, _, _ := utils.DecodeContractCode(compress)
 	return wasmcode.Code, state.Error()
 }
 
@@ -561,19 +530,8 @@ func (s *PublicBlockChainAPI) GetAbi(ctx context.Context, address common.Address
 	if state == nil || err != nil {
 		return nil, err
 	}
-	code := state.GetCode(address)
-	wasmcode := wavm.WasmCode{}
-	decompress, err := utils.DeCompress(code)
-	if err != nil {
-		return nil, err
-	}
-	sep := []byte{0x7d} // 分割符'}',是{Code: "0x2da32be...", Abi: "0x23290da98acb032..."}的最后一位
-	sepIdx := bytes.Index(decompress, sep)
-
-	err = json.Unmarshal(decompress[:sepIdx+1], &wasmcode)
-	if err != nil {
-		return nil, err
-	}
+	compress := state.GetCode(address)
+	wasmcode, _, _ := utils.DecodeContractCode(compress)
 	return wasmcode.Abi, state.Error()
 }
 
@@ -600,10 +558,8 @@ type CallArgs struct {
 }
 
 func (s *PublicBlockChainAPI) doCall(ctx context.Context, args CallArgs, blockNr rpc.BlockNumber, vmCfg vm.Config, timeout time.Duration) ([]byte, uint64, bool, error) {
-	defer func(start time.Time) { log.Debug("Executing EVM call finished", "runtime", time.Since(start)) }(time.Now())
-	log.Debug("api", "docall args", args)
+	defer func(start time.Time) { log.Debug("Executing VM call finished", "runtime", time.Since(start)) }(time.Now())
 	state, header, err := s.b.StateAndHeaderByNumber(ctx, blockNr)
-	log.Debug("api", "core.ApplyMessage", state, "err", err)
 	if state == nil || err != nil {
 		return nil, 0, false, err
 	}
@@ -637,22 +593,22 @@ func (s *PublicBlockChainAPI) doCall(ctx context.Context, args CallArgs, blockNr
 	// Make sure the context is cancelled when the call has completed
 	// this makes sure resources are cleaned up.
 	defer cancel()
-	// Get a new instance of the EVM.
-	evm, vmError, err := s.b.GetVM(ctx, msg, state, header, vmCfg)
+	// Get a new instance of the VM.
+	newVm, vmError, err := s.b.GetVM(ctx, msg, state, header, vmCfg)
 	if err != nil {
 		return nil, 0, false, err
 	}
-	// Wait for the context to be done and cancel the evm. Even if the
-	// EVM has finished, cancelling may be done (repeatedly)
+	// Wait for the context to be done and cancel the vm. Even if the
+	// VM has finished, cancelling may be done (repeatedly)
 	go func() {
 		<-ctx.Done()
-		evm.Cancel()
+		newVm.Cancel()
 	}()
 
 	// Setup the gas pool (also for unmetered requests)
 	// and apply the message.
 	gp := new(core.GasPool).AddGas(math.MaxUint64)
-	res, gas, failed, err := core.ApplyMessage(evm, msg, gp)
+	res, gas, failed, err := core.ApplyMessage(newVm, msg, gp)
 	if err := vmError(); err != nil {
 		return nil, 0, false, err
 	}
@@ -663,7 +619,6 @@ func (s *PublicBlockChainAPI) doCall(ctx context.Context, args CallArgs, blockNr
 // It doesn't make and changes in the state/blockchain and is useful to execute and retrieve values.
 func (s *PublicBlockChainAPI) Call(ctx context.Context, args CallArgs, blockNr rpc.BlockNumber) (hexutil.Bytes, error) {
 	result, _, _, err := s.doCall(ctx, args, blockNr, vm.Config{}, 5*time.Second)
-	log.Debug("api", "call result", result, "err", err)
 	return (hexutil.Bytes)(result), err
 }
 
@@ -719,81 +674,103 @@ func (s *PublicBlockChainAPI) EstimateGas(ctx context.Context, args CallArgs) (h
 // GetAllCandidates returns a list of all the candidates.
 func (s *PublicBlockChainAPI) GetAllCandidates(ctx context.Context) ([]rpc.Candidate, error) {
 	// Get stateDB of current block
-	blockNr := rpc.BlockNumber(s.b.CurrentBlock().NumberU64())
-	stateDB, _, err := s.b.StateAndHeaderByNumber(ctx, blockNr)
+	stateDB, err := s.stateDbOfCurrent(ctx)
 	if stateDB == nil || err != nil {
 		return nil, err
 	}
 	// Get the list
-	list := election.GetAllCandidates(stateDB)
+	list := election.GetAllCandidates(stateDB, true)
 	if len(list) == 0 {
-		return nil, errors.New("empty witness candidates list")
+		return nil, nil
 	}
 
 	// Transform to rpc candidate
 	rpcCandidates := make([]rpc.Candidate, len(list))
 	for i, ca := range list {
 		rpcCandidates[i].Owner = ca.Owner.String()
-		rpcCandidates[i].Active = ca.Active
+		rpcCandidates[i].Name = string(ca.Name)
+		rpcCandidates[i].Registered = ca.Registered
 		rpcCandidates[i].Url = string(ca.Url)
-		rpcCandidates[i].VoteCount = ca.VoteCount
-		rpcCandidates[i].TotalBounty = ca.TotalBounty
-		rpcCandidates[i].ExtractedBounty = ca.ExtractedBounty
-		rpcCandidates[i].LastExtractTime = ca.LastExtractTime
+		rpcCandidates[i].VoteCount = (*hexutil.Big)(ca.VoteCount)
+		rpcCandidates[i].Website = string(ca.Website)
+		rpcCandidates[i].Binder = ca.Binder.String()
+		rpcCandidates[i].Beneficiary = ca.Beneficiary.String()
+		rpcCandidates[i].Bind = ca.Bind
 	}
 	return rpcCandidates, nil
 }
 
-// GetVoter returns a voter's information, stake information included
+// GetVoter returns a voter's information.
 func (s *PublicBlockChainAPI) GetVoter(ctx context.Context, address common.Address) (*rpc.Voter, error) {
-	// Get stateDB of current block
-	blockNr := rpc.BlockNumber(s.b.CurrentBlock().NumberU64())
-	stateDB, _, err := s.b.StateAndHeaderByNumber(ctx, blockNr)
+	stateDB, err := s.stateDbOfCurrent(ctx)
 	if stateDB == nil || err != nil {
 		return nil, err
 	}
 
+	// Fill voter information
+	empty := common.Address{}
 	v := election.GetVoter(stateDB, address)
-	if v == nil {
-		return nil, fmt.Errorf("no vorter information for address: %s", address.String())
+	if v == nil || v.Owner == empty {
+		return nil, nil
 	}
-
 	voter := &rpc.Voter{
 		Owner:             v.Owner,
 		IsProxy:           v.IsProxy,
-		ProxyVoteCount:    v.ProxyVoteCount,
+		ProxyVoteCount:    (*hexutil.Big)(v.ProxyVoteCount),
 		Proxy:             v.Proxy,
-		LastVoteCount:     v.LastVoteCount,
-		LastVoteTimeStamp: v.TimeStamp,
+		LastStakeCount:    (*hexutil.Big)(v.LastStakeCount),
+		LastVoteCount:     (*hexutil.Big)(v.LastVoteCount),
+		LastVoteTimeStamp: (*hexutil.Big)(v.TimeStamp),
 		VoteCandidates:    v.VoteCandidates,
 	}
 
-	// Fill stake information
-	stake := election.GetStake(stateDB, address)
-	if stake != nil {
-		voter.StakeCount = stake.StakeCount
-		voter.LastStakeTimeStamp = stake.TimeStamp
-	}
 	return voter, nil
+}
+
+// GetStake returns a stake information.
+func (s *PublicBlockChainAPI) GetStake(ctx context.Context, address common.Address) (*rpc.Stake, error) {
+	stateDB, err := s.stateDbOfCurrent(ctx)
+	if stateDB == nil || err != nil {
+		return nil, err
+	}
+
+	// Fill stake information
+	empty := common.Address{}
+	st := election.GetStake(stateDB, address)
+	if st == nil || st.Owner == empty {
+		return nil, nil
+	}
+	stake := &rpc.Stake{
+		Owner:              st.Owner,
+		StakeCount:         (*hexutil.Big)(st.StakeCount),
+		Vnt:                (*hexutil.Big)(st.Vnt),
+		LastStakeTimeStamp: (*hexutil.Big)(st.TimeStamp),
+	}
+
+	return stake, nil
 }
 
 // GetRestVNTBounty returns the rest VNT bounty.
 func (s *PublicBlockChainAPI) GetRestVNTBounty(ctx context.Context) (*big.Int, error) {
-	// Get stateDB of current block
-	blockNr := rpc.BlockNumber(s.b.CurrentBlock().NumberU64())
-	stateDB, _, err := s.b.StateAndHeaderByNumber(ctx, blockNr)
+	stateDB, err := s.stateDbOfCurrent(ctx)
 	if stateDB == nil || err != nil {
 		return nil, err
 	}
 
-	if rest := election.QueryRestVNTBounty(stateDB); rest == nil {
+	if rest := election.QueryRestReward(stateDB); rest == nil {
 		return nil, errors.New("can not get rest VNT bounty data")
 	} else {
 		return rest, nil
 	}
 }
 
-// ExecutionResult groups all structured logs emitted by the EVM
+func (s *PublicBlockChainAPI) stateDbOfCurrent(ctx context.Context) (*state.StateDB, error) {
+	blockNr := rpc.BlockNumber(s.b.CurrentBlock().NumberU64())
+	stateDB, _, err := s.b.StateAndHeaderByNumber(ctx, blockNr)
+	return stateDB, err
+}
+
+// ExecutionResult groups all structured logs emitted by the VM
 // while replaying a transaction in debug mode as well as transaction
 // execution status, the amount of gas used and the return value
 type ExecutionResult struct {
@@ -801,9 +778,10 @@ type ExecutionResult struct {
 	Failed      bool           `json:"failed"`
 	ReturnValue string         `json:"returnValue"`
 	StructLogs  []StructLogRes `json:"structLogs"`
+	DebugLogs   []DebugLogRes  `json:"debugLogs"`
 }
 
-// StructLogRes stores a structured log emitted by the EVM while replaying a
+// StructLogRes stores a structured log emitted by the VM while replaying a
 // transaction in debug mode
 type StructLogRes struct {
 	Pc      uint64             `json:"pc"`
@@ -811,23 +789,32 @@ type StructLogRes struct {
 	Gas     uint64             `json:"gas"`
 	GasCost uint64             `json:"gasCost"`
 	Depth   int                `json:"depth"`
-	Error   error              `json:"error,omitempty"`
+	Error   string             `json:"error,omitempty"`
 	Stack   *[]string          `json:"stack,omitempty"`
 	Memory  *[]string          `json:"memory,omitempty"`
 	Storage *map[string]string `json:"storage,omitempty"`
 }
 
-// formatLogs formats EVM returned structured logs for json output
-func FormatLogs(logs []vm.StructLog) []StructLogRes {
+type DebugLogRes struct {
+	PrintMsg string `json:"printMsg"`
+}
+
+// formatLogs formats VM returned structured logs for json output
+func FormatLogs(logs []wavm.StructLog, debugLog []wavm.DebugLog) ([]StructLogRes, []DebugLogRes) {
 	formatted := make([]StructLogRes, len(logs))
+
 	for index, trace := range logs {
+		var errString string
+		if trace.Err != nil {
+			errString = trace.Err.Error()
+		}
 		formatted[index] = StructLogRes{
 			Pc:      trace.Pc,
 			Op:      trace.Op.String(),
 			Gas:     trace.Gas,
 			GasCost: trace.GasCost,
 			Depth:   trace.Depth,
-			Error:   trace.Err,
+			Error:   errString,
 		}
 		if trace.Stack != nil {
 			stack := make([]string, len(trace.Stack))
@@ -851,7 +838,13 @@ func FormatLogs(logs []vm.StructLog) []StructLogRes {
 			formatted[index].Storage = &storage
 		}
 	}
-	return formatted
+	debugFormatted := make([]DebugLogRes, len(debugLog))
+	for index, trace := range debugLog {
+		debugFormatted[index] = DebugLogRes{
+			PrintMsg: trace.PrintMsg,
+		}
+	}
+	return formatted, debugFormatted
 }
 
 // RPCMarshalBlock converts the given block to the RPC output which depends on fullTx. If inclTx is true transactions are
@@ -934,10 +927,7 @@ type RPCTransaction struct {
 // newRPCTransaction returns a transaction that will serialize to the RPC
 // representation, with the given location metadata set (if available).
 func newRPCTransaction(tx *types.Transaction, blockHash common.Hash, blockNumber uint64, index uint64) *RPCTransaction {
-	var signer types.Signer = types.FrontierSigner{}
-	if tx.Protected() {
-		signer = types.NewEIP155Signer(tx.ChainId())
-	}
+	signer := types.NewHubbleSigner(tx.ChainId())
 	from, _ := types.Sender(signer, tx)
 	v, r, s := tx.RawSignatureValues()
 
@@ -1111,10 +1101,7 @@ func (s *PublicTransactionPoolAPI) GetTransactionReceipt(ctx context.Context, ha
 	}
 	receipt := receipts[index]
 
-	var signer types.Signer = types.FrontierSigner{}
-	if tx.Protected() {
-		signer = types.NewEIP155Signer(tx.ChainId())
-	}
+	signer := types.NewHubbleSigner(tx.ChainId())
 	from, _ := types.Sender(signer, tx)
 
 	fields := map[string]interface{}{
@@ -1157,10 +1144,7 @@ func (s *PublicTransactionPoolAPI) sign(addr common.Address, tx *types.Transacti
 		return nil, err
 	}
 	// Request the wallet to sign the transaction
-	var chainID *big.Int
-	if config := s.b.ChainConfig(); config.IsEIP155(s.b.CurrentBlock().Number()) {
-		chainID = config.ChainID
-	}
+	chainID := s.b.ChainConfig().ChainID
 	return wallet.SignTx(account, tx, chainID)
 }
 
@@ -1226,11 +1210,6 @@ func (args *SendTxArgs) toTransaction() *types.Transaction {
 	} else if args.Input != nil {
 		input = *args.Input
 	}
-	if args.Data != nil {
-		log.Debug("api", "toTransaction input 1", args.Data.String())
-	}
-	log.Debug("api", "toTransaction input 2", input, "input string", string(input), "data", args.Data)
-	log.Debug("api", "toTransaction input 3", common.ToHex(input))
 	if args.To == nil {
 		return types.NewContractCreation(uint64(*args.Nonce), (*big.Int)(args.Value), uint64(*args.Gas), (*big.Int)(args.GasPrice), input)
 	}
@@ -1242,7 +1221,6 @@ func submitTransaction(ctx context.Context, b Backend, tx *types.Transaction) (c
 	if err := b.SendTx(ctx, tx); err != nil {
 		return common.Hash{}, err
 	}
-	log.Debug("api", "submitTransaction", tx.Data())
 	if tx.To() == nil {
 		signer := types.MakeSigner(b.ChainConfig(), b.CurrentBlock().Number())
 		from, err := types.Sender(signer, tx)
@@ -1260,7 +1238,6 @@ func submitTransaction(ctx context.Context, b Backend, tx *types.Transaction) (c
 // SendTransaction creates a transaction for the given argument, sign it and submit it to the
 // transaction pool.
 func (s *PublicTransactionPoolAPI) SendTransaction(ctx context.Context, args SendTxArgs) (common.Hash, error) {
-	log.Debug("api", "SendTransaction args", args)
 	// Look up the wallet containing the requested signer
 	account := accounts.Account{Address: args.From}
 
@@ -1283,10 +1260,7 @@ func (s *PublicTransactionPoolAPI) SendTransaction(ctx context.Context, args Sen
 	// Assemble the transaction and sign with the wallet
 	tx := args.toTransaction()
 
-	var chainID *big.Int
-	if config := s.b.ChainConfig(); config.IsEIP155(s.b.CurrentBlock().Number()) {
-		chainID = config.ChainID
-	}
+	chainID := s.b.ChainConfig().ChainID
 	signed, err := wallet.SignTx(account, tx, chainID)
 	if err != nil {
 		return common.Hash{}, err
@@ -1297,7 +1271,6 @@ func (s *PublicTransactionPoolAPI) SendTransaction(ctx context.Context, args Sen
 // SendRawTransaction will add the signed transaction to the transaction pool.
 // The sender is responsible for signing the transaction and using the correct nonce.
 func (s *PublicTransactionPoolAPI) SendRawTransaction(ctx context.Context, encodedTx hexutil.Bytes) (common.Hash, error) {
-	log.Debug("api", "SendRawTransaction", encodedTx)
 	tx := new(types.Transaction)
 	if err := rlp.DecodeBytes(encodedTx, tx); err != nil {
 		return common.Hash{}, err
@@ -1306,14 +1279,14 @@ func (s *PublicTransactionPoolAPI) SendRawTransaction(ctx context.Context, encod
 }
 
 // Sign calculates an ECDSA signature for:
-// keccack256("\x19Ethereum Signed Message:\n" + len(message) + message).
+// keccack256("\x19Hubble Signed Message:\n" + len(message) + message).
 //
 // Note, the produced signature conforms to the secp256k1 curve R, S and V values,
 // where the V value will be 27 or 28 for legacy reasons.
 //
 // The account associated with addr must be unlocked.
 //
-// https://github.com/ethereum/wiki/wiki/JSON-RPC#eth_sign
+// https://github.com/vntchain/vnt-documentation/blob/master/api/vnt-json-rpc-api.md#core_sign
 func (s *PublicTransactionPoolAPI) Sign(addr common.Address, data hexutil.Bytes) (hexutil.Bytes, error) {
 	// Look up the wallet containing the requested signer
 	account := accounts.Account{Address: addr}
@@ -1378,10 +1351,7 @@ func (s *PublicTransactionPoolAPI) PendingTransactions() ([]*RPCTransaction, err
 	}
 	transactions := make([]*RPCTransaction, 0, len(pending))
 	for _, tx := range pending {
-		var signer types.Signer = types.HomesteadSigner{}
-		if tx.Protected() {
-			signer = types.NewEIP155Signer(tx.ChainId())
-		}
+		signer := types.NewHubbleSigner(tx.ChainId())
 		from, _ := types.Sender(signer, tx)
 		if _, exists := accounts[from]; exists {
 			transactions = append(transactions, newRPCPendingTransaction(tx))
@@ -1406,10 +1376,7 @@ func (s *PublicTransactionPoolAPI) Resend(ctx context.Context, sendArgs SendTxAr
 	}
 
 	for _, p := range pending {
-		var signer types.Signer = types.HomesteadSigner{}
-		if p.Protected() {
-			signer = types.NewEIP155Signer(p.ChainId())
-		}
+		signer := types.NewHubbleSigner(p.ChainId())
 		wantSigHash := signer.Hash(matchTx)
 
 		if pFrom, err := types.Sender(signer, p); err == nil && pFrom == sendArgs.From && signer.Hash(p) == wantSigHash {

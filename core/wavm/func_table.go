@@ -1,3 +1,19 @@
+// Copyright 2019 The go-vnt Authors
+// This file is part of the go-vnt library.
+//
+// The go-vnt library is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// The go-vnt library is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU Lesser General Public License for more details.
+//
+// You should have received a copy of the GNU Lesser General Public License
+// along with the go-vnt library. If not, see <http://www.gnu.org/licenses/>.
+
 package wavm
 
 import (
@@ -6,78 +22,19 @@ import (
 	"github.com/vntchain/vnt-wasm/wasm"
 )
 
-//const (
-//	OpCodeGetBalanceFromAddress = byte(0xc8 + iota)
-//	OpCodeStorageWrite
-//	OpCodeStorageRead
-//	OpCodeGetBlockNumber
-//	OpCodeRet
-//	OpCodeFetchInput
-//	OpCodeInputLength
-//	OpCodeGetGas
-//	OpCodeGetBlockHash
-//	OpCodeGetCoinBase
-//	OpCodeGetTimestamp
-//	OpCodeGetOrigin
-//	OpCodeGetSender
-//	OpCodeGetGasLimit
-//	OpCodeGetDifficulty
-//	OpCodeGenerateKey
-//	OpCodeGetStorageCount
-//	OpCodeGetValue
-//	OpCodeSHA3
-//	OpCodeGetContractAddress
-//	OpCodeAssert
-//
-//	// OpCodeFallback
-//	OpCodeSendFromContract
-//	OpCodeGetContractValue
-//
-//	OpCodeEvent
-//
-//	OpCodePrintAddress
-//	OpCodePrintStr
-//	OpCodePrintUint64T
-//	OpCodePrintUint32T
-//	OpCodePrintInt64T
-//	OpCodePrintInt32T
-//
-//	OpCodeFromI64
-//	OpCodeFromU64
-//	OpCodeToI64
-//	OpCodeToU64
-//
-//	OpCodeConcat
-//
-//	OpCodeContractCall
-//	OpCodeWrite
-//	OpCodeRead
-//	OpCodePuta
-//	OpCodeRegister
-//
-//	//Array操作
-//	OpCodePushArray
-//	OpCodeSetArray
-//	OpCodeReadArray
-//	OpCodeLength
-//
-//	//将字符串转化为地址
-//	OpCodeAddress
-//)
-
 const (
 	OpNameGetBalanceFromAddress = "GetBalanceFromAddress"
 	OpNameGetBlockNumber        = "GetBlockNumber"
 	OpNameGetGas                = "GetGas"
 	OpNameGetBlockHash          = "GetBlockHash"
-	OpNameGetCoinBase           = "GetCoinBase"
+	OpNameGetBlockProduser      = "GetBlockProduser"
 	OpNameGetTimestamp          = "GetTimestamp"
 	OpNameGetOrigin             = "GetOrigin"
 	OpNameGetSender             = "GetSender"
 	OpNameGetGasLimit           = "GetGasLimit"
-	OpNameGetDifficulty         = "GetDifficulty"
 	OpNameGetValue              = "GetValue"
 	OpNameSHA3                  = "SHA3"
+	OpNameEcrecover             = "Ecrecover"
 	OpNameGetContractAddress    = "GetContractAddress"
 	OpNameAssert                = "Assert"
 
@@ -105,8 +62,10 @@ const (
 	OpNameContractCall = "ContractCall"
 
 	//将字符串转化为地址
-	OpNameAddressFrom = "AddressFrom"
-	OpNameU256From    = "U256From"
+	OpNameAddressFrom     = "AddressFrom"
+	OpNameAddressToString = "AddressToString"
+	OpNameU256From        = "U256From"
+	OpNameU256ToString    = "U256ToString"
 
 	OpNameAddKeyInfo          = "AddKeyInfo"
 	OpNameWriteWithPointer    = "WriteWithPointer"
@@ -120,8 +79,14 @@ const (
 	OpNameU256Sub     = "U256_Sub"
 	OpNameU256Mul     = "U256_Mul"
 	OpNameU256Div     = "U256_Div"
+	OpNameU256Mod     = "U256_Mod"
 	OpNameU256Pow     = "U256_Pow"
 	OpNameU256Cmp     = "U256_Cmp"
+	OpNameU256Shl     = "U256_Shl"
+	OpNameU256Shr     = "U256_Shr"
+	OpNameU256And     = "U256_And"
+	OpNameU256Or      = "U256_Or"
+	OpNameU256Xor     = "U256_Xor"
 
 	//math
 	OpNamePow = "Pow"
@@ -144,7 +109,7 @@ func (ef *EnvFunctions) getFuncTable() map[string]wasm.Function {
 			Host: reflect.ValueOf(ef.GetBalanceFromAddress),
 			Sig: &wasm.FunctionSig{
 				ParamTypes:  []wasm.ValueType{wasm.ValueTypeI32},
-				ReturnTypes: []wasm.ValueType{wasm.ValueTypeI64},
+				ReturnTypes: []wasm.ValueType{wasm.ValueTypeI32},
 			},
 			Body: &wasm.FunctionBody{
 				Code: []byte{},
@@ -170,8 +135,8 @@ func (ef *EnvFunctions) getFuncTable() map[string]wasm.Function {
 				Code: []byte{},
 			},
 		},
-		OpNameGetCoinBase: {
-			Host: reflect.ValueOf(ef.GetCoinBase),
+		OpNameGetBlockProduser: {
+			Host: reflect.ValueOf(ef.GetBlockProduser),
 			Sig: &wasm.FunctionSig{
 				ParamTypes:  []wasm.ValueType{},
 				ReturnTypes: []wasm.ValueType{wasm.ValueTypeI32},
@@ -220,16 +185,6 @@ func (ef *EnvFunctions) getFuncTable() map[string]wasm.Function {
 				Code: []byte{},
 			},
 		},
-		OpNameGetDifficulty: {
-			Host: reflect.ValueOf(ef.GetDifficulty),
-			Sig: &wasm.FunctionSig{
-				ParamTypes:  []wasm.ValueType{},
-				ReturnTypes: []wasm.ValueType{wasm.ValueTypeI32},
-			},
-			Body: &wasm.FunctionBody{
-				Code: []byte{},
-			},
-		},
 		OpNameGetValue: {
 			Host: reflect.ValueOf(ef.GetValue),
 			Sig: &wasm.FunctionSig{
@@ -254,6 +209,16 @@ func (ef *EnvFunctions) getFuncTable() map[string]wasm.Function {
 			Host: reflect.ValueOf(ef.SHA3),
 			Sig: &wasm.FunctionSig{
 				ParamTypes:  []wasm.ValueType{wasm.ValueTypeI32},
+				ReturnTypes: []wasm.ValueType{wasm.ValueTypeI32},
+			},
+			Body: &wasm.FunctionBody{
+				Code: []byte{},
+			},
+		},
+		OpNameEcrecover: {
+			Host: reflect.ValueOf(ef.Ecrecover),
+			Sig: &wasm.FunctionSig{
+				ParamTypes:  []wasm.ValueType{wasm.ValueTypeI32, wasm.ValueTypeI32, wasm.ValueTypeI32, wasm.ValueTypeI32},
 				ReturnTypes: []wasm.ValueType{wasm.ValueTypeI32},
 			},
 			Body: &wasm.FunctionBody{
@@ -458,19 +423,6 @@ func (ef *EnvFunctions) getFuncTable() map[string]wasm.Function {
 				Code: []byte{},
 			},
 		},
-		//OpNameRegister: {
-		//	IsHost: true,
-		//	FieldName: OpNameRegister),
-		//	Host: reflect.ValueOf(ef.Register),
-		//	OriFieldName: OpNameRegister,
-		//	Sig: &wasm.FunctionSig{
-		//		ParamTypes:  []wasm.ValueType{wasm.ValueTypeI32, wasm.ValueTypeI32},
-		//		ReturnTypes: []wasm.ValueType{},
-		//	},
-		//	Body: &wasm.FunctionBody{
-		//		Code: []byte{},
-		//	},
-		//},
 		OpNameAddressFrom: {
 			Host: reflect.ValueOf(ef.AddressFrom),
 			Sig: &wasm.FunctionSig{
@@ -481,8 +433,28 @@ func (ef *EnvFunctions) getFuncTable() map[string]wasm.Function {
 				Code: []byte{},
 			},
 		},
+		OpNameAddressToString: {
+			Host: reflect.ValueOf(ef.AddressToString),
+			Sig: &wasm.FunctionSig{
+				ParamTypes:  []wasm.ValueType{wasm.ValueTypeI32},
+				ReturnTypes: []wasm.ValueType{wasm.ValueTypeI32},
+			},
+			Body: &wasm.FunctionBody{
+				Code: []byte{},
+			},
+		},
 		OpNameU256From: {
 			Host: reflect.ValueOf(ef.U256From),
+			Sig: &wasm.FunctionSig{
+				ParamTypes:  []wasm.ValueType{wasm.ValueTypeI32},
+				ReturnTypes: []wasm.ValueType{wasm.ValueTypeI32},
+			},
+			Body: &wasm.FunctionBody{
+				Code: []byte{},
+			},
+		},
+		OpNameU256ToString: {
+			Host: reflect.ValueOf(ef.U256ToString),
 			Sig: &wasm.FunctionSig{
 				ParamTypes:  []wasm.ValueType{wasm.ValueTypeI32},
 				ReturnTypes: []wasm.ValueType{wasm.ValueTypeI32},
@@ -591,6 +563,16 @@ func (ef *EnvFunctions) getFuncTable() map[string]wasm.Function {
 				Code: []byte{},
 			},
 		},
+		OpNameU256Mod: {
+			Host: reflect.ValueOf(ef.U256Mod),
+			Sig: &wasm.FunctionSig{
+				ParamTypes:  []wasm.ValueType{wasm.ValueTypeI32, wasm.ValueTypeI32},
+				ReturnTypes: []wasm.ValueType{wasm.ValueTypeI32},
+			},
+			Body: &wasm.FunctionBody{
+				Code: []byte{},
+			},
+		},
 		OpNameU256Pow: {
 			Host: reflect.ValueOf(ef.U256Pow),
 			Sig: &wasm.FunctionSig{
@@ -603,6 +585,56 @@ func (ef *EnvFunctions) getFuncTable() map[string]wasm.Function {
 		},
 		OpNameU256Cmp: {
 			Host: reflect.ValueOf(ef.U256Cmp),
+			Sig: &wasm.FunctionSig{
+				ParamTypes:  []wasm.ValueType{wasm.ValueTypeI32, wasm.ValueTypeI32},
+				ReturnTypes: []wasm.ValueType{wasm.ValueTypeI32},
+			},
+			Body: &wasm.FunctionBody{
+				Code: []byte{},
+			},
+		},
+		OpNameU256Shl: {
+			Host: reflect.ValueOf(ef.U256Shl),
+			Sig: &wasm.FunctionSig{
+				ParamTypes:  []wasm.ValueType{wasm.ValueTypeI32, wasm.ValueTypeI32},
+				ReturnTypes: []wasm.ValueType{wasm.ValueTypeI32},
+			},
+			Body: &wasm.FunctionBody{
+				Code: []byte{},
+			},
+		},
+		OpNameU256Shr: {
+			Host: reflect.ValueOf(ef.U256Shr),
+			Sig: &wasm.FunctionSig{
+				ParamTypes:  []wasm.ValueType{wasm.ValueTypeI32, wasm.ValueTypeI32},
+				ReturnTypes: []wasm.ValueType{wasm.ValueTypeI32},
+			},
+			Body: &wasm.FunctionBody{
+				Code: []byte{},
+			},
+		},
+		OpNameU256And: {
+			Host: reflect.ValueOf(ef.U256And),
+			Sig: &wasm.FunctionSig{
+				ParamTypes:  []wasm.ValueType{wasm.ValueTypeI32, wasm.ValueTypeI32},
+				ReturnTypes: []wasm.ValueType{wasm.ValueTypeI32},
+			},
+			Body: &wasm.FunctionBody{
+				Code: []byte{},
+			},
+		},
+		OpNameU256Xor: {
+			Host: reflect.ValueOf(ef.U256Xor),
+			Sig: &wasm.FunctionSig{
+				ParamTypes:  []wasm.ValueType{wasm.ValueTypeI32, wasm.ValueTypeI32},
+				ReturnTypes: []wasm.ValueType{wasm.ValueTypeI32},
+			},
+			Body: &wasm.FunctionBody{
+				Code: []byte{},
+			},
+		},
+		OpNameU256Or: {
+			Host: reflect.ValueOf(ef.U256Or),
 			Sig: &wasm.FunctionSig{
 				ParamTypes:  []wasm.ValueType{wasm.ValueTypeI32, wasm.ValueTypeI32},
 				ReturnTypes: []wasm.ValueType{wasm.ValueTypeI32},

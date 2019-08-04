@@ -16,19 +16,17 @@
 
 package params
 
-// These are the multipliers for ether denominations.
+// These are the multipliers for vnt denominations.
 // Example: To get the wei value of an amount in 'douglas', use
 //
 //    new(big.Int).Mul(value, big.NewInt(params.Douglas))
 //
 const (
 	Wei      = 1
-	Ada      = 1e3
-	Babbage  = 1e6
-	Shannon  = 1e9
-	Szabo    = 1e12
-	Finney   = 1e15
-	Ether    = 1e18
-	Einstein = 1e21
-	Douglas  = 1e42
+	Kwei     = 1e3
+	Mwei     = 1e6
+	Gwei     = 1e9
+	Microvnt = 1e12
+	Millivnt = 1e15
+	Vnt      = 1e18
 )

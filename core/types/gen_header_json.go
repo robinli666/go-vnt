@@ -28,7 +28,7 @@ func (h Header) MarshalJSON() ([]byte, error) {
 		GasUsed     hexutil.Uint64   `json:"gasUsed"          gencodec:"required"`
 		Time        *hexutil.Big     `json:"timestamp"        gencodec:"required"`
 		Extra       hexutil.Bytes    `json:"extraData"        gencodec:"required"`
-		Witnesses   []common.Address `json:"witnesses"	      gencodec:"required"`
+		Witnesses   []common.Address `json:"witnesses"        gencodec:"required"`
 		Signature   hexutil.Bytes    `json:"signature"        gencodec:"required"`
 		Hash        common.Hash      `json:"hash"`
 	}
@@ -66,7 +66,7 @@ func (h *Header) UnmarshalJSON(input []byte) error {
 		GasUsed     *hexutil.Uint64  `json:"gasUsed"          gencodec:"required"`
 		Time        *hexutil.Big     `json:"timestamp"        gencodec:"required"`
 		Extra       *hexutil.Bytes   `json:"extraData"        gencodec:"required"`
-		Witnesses   []common.Address `json:"witnesses"	      gencodec:"required"`
+		Witnesses   []common.Address `json:"witnesses"        gencodec:"required"`
 		Signature   *hexutil.Bytes   `json:"signature"        gencodec:"required"`
 	}
 	var dec Header
@@ -78,7 +78,7 @@ func (h *Header) UnmarshalJSON(input []byte) error {
 	}
 	h.ParentHash = *dec.ParentHash
 	if dec.Coinbase == nil {
-		return errors.New("missing required field 'miner' for Header")
+		return errors.New("missing required field 'producer' for Header")
 	}
 	h.Coinbase = *dec.Coinbase
 	if dec.Root == nil {

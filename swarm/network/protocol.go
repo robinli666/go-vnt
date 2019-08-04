@@ -33,6 +33,7 @@ The bzz protocol component speaks the bzz protocol
 import (
 	"errors"
 	"fmt"
+	"math/big"
 	"net"
 	"strconv"
 	"time"
@@ -211,7 +212,7 @@ func (self *bzz) handle() error {
 	}
 
 	// make sure that the payload has been fully consumed
-	// yhx -- 按理说，新版的协议处理方式，不会有残留数据得不到处理
+	// 按理说，新版的协议处理方式，不会有残留数据得不到处理
 	// defer msg.Discard()
 
 	switch msg.Body.Type {
@@ -383,7 +384,7 @@ func (self *bzz) handleStatus() (err error) {
 
 	if self.swapEnabled {
 		// set remote profile for accounting
-		self.swap, err = bzzswap.NewSwap(self.swapParams, status.Swap, self.backend, self)
+		self.swap, err = bzzswap.NewSwap(big.NewInt(int64(self.NetworkId)), self.swapParams, status.Swap, self.backend, self)
 		if err != nil {
 			return err
 		}

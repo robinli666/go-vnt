@@ -162,7 +162,6 @@ func getTestAccount(t *testing.T, dir string) (conf *node.Config, account accoun
 	conf = &node.Config{
 		DataDir: dir,
 		IPCPath: "bzzd.ipc",
-		NoUSB:   true,
 	}
 	n, err := node.New(conf)
 	if err != nil {
@@ -202,7 +201,7 @@ func newTestNode(t *testing.T, dir string) *testNode {
 		"--nodiscover",
 		"--datadir", dir,
 		"--ipcpath", conf.IPCPath,
-		"--ens-api", "",
+		"--vns-api", "",
 		"--bzzaccount", account.Address.String(),
 		"--bzznetworkid", "321",
 		"--bzzport", httpPort,

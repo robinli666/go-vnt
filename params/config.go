@@ -25,65 +25,99 @@ import (
 
 // Genesis hashes to enforce below configs on.
 var (
-	// MainnetGenesisHash = common.HexToHash("0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3")
-	// TestnetGenesisHash = common.HexToHash("0x41941023680923e0fe4d74a34bdac8141f2540e3ae90623718e47d66d1ca4a2d")
-	MainnetGenesisHash = common.HexToHash("0x821dde9e8f56e68bd337ee1b3141e20cb9eb8bd36779bc394cc76de088f002cb")
-	TestnetGenesisHash = common.HexToHash("0x47c5e7c031ac0141b5da331d83f07d6a99d8a660a01b8fd8b53c820a3e2e58ab")
+	MainnetGenesisHash = common.HexToHash("0xf2ba87b7a6b3c3ff2fc2c0e2b2985b9cfc7ca24daaa39ac04677855b1583e5ad")
 )
 
 var (
 	// MainnetChainConfig is the chain parameters to run a node on the main network.
 	MainnetChainConfig = &ChainConfig{
-		ChainID:             big.NewInt(1),
-		HomesteadBlock:      big.NewInt(1150000),
-		DAOForkBlock:        big.NewInt(1920000),
-		DAOForkSupport:      true,
-		EIP150Block:         big.NewInt(2463000),
-		EIP150Hash:          common.HexToHash("0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0"),
-		EIP155Block:         big.NewInt(2675000),
-		EIP158Block:         big.NewInt(2675000),
-		ByzantiumBlock:      big.NewInt(4370000),
-		ConstantinopleBlock: nil,
+		ChainID: big.NewInt(1),
 		Dpos: &DposConfig{
 			Period:       2,
-			WitnessesNum: 4,
+			WitnessesNum: 19,
+			WitnessesUrl: []string{
+				"/ip4/47.106.71.114/tcp/3001/ipfs/1kHfbk8u12U1HSyaqAe6f622wVMESHcvFZ8VcbGKwsrtT6H",
+				"/ip4/47.108.69.101/tcp/3001/ipfs/1kHb7UpvD2zbEgCCPzboTtJLENQ1YhEZ1H2A7QNTb18sHd4",
+				"/ip4/47.108.67.119/tcp/3001/ipfs/1kHjhzoNTxEpFvRky1oVvCUAPBUuGzBvBcXmkroDU9NhACg",
+				"/ip4/39.100.143.156/tcp/3001/ipfs/1kHG1essWxbjSUjwKMrJcva6Y7XfPoBN86pUemd4wnd2X2A",
+				"/ip4/118.190.59.122/tcp/3001/ipfs/1kHBXTtDX4JqStm4qBNCcCZar9isCyu74BPgX6b2odm7zw7",
+
+				"/ip4/118.190.59.100/tcp/3001/ipfs/1kHWbCuCgjLnERsaVr7FCSAWFiA7Sx1CdzstMQKKkEWdYSr",
+				"/ip4/47.56.69.191/tcp/3001/ipfs/1kHcupmVj3eLe6QdgrXRn5qetpQQc4XhYc6LXNhQUkRCDK5",
+				"/ip4/39.97.171.233/tcp/3001/ipfs/1kHDnV8YSUrHNLf6NGWY7QHxBjMLnKPxKFKvMdPLt1Gg7a6",
+				"/ip4/47.103.107.188/tcp/3001/ipfs/1kHTKpK29Kw2EvJ3C817yn6wNDgpXw6oWAkUz8AzAozrVHD",
+				"/ip4/47.103.57.160/tcp/3001/ipfs/1kHD3RiEFGZE2SQQgGhX1yzipcR8sE6cSaTj3Xi1yvF1EBL",
+
+				"/ip4/47.254.235.57/tcp/3001/ipfs/1kHMwGapAtV92rXgkxRx4dgjUZnXVtE6wUa8Bk3yzFYLz4h",
+				"/ip4/120.77.236.120/tcp/3001/ipfs/1kHHW1DrdwETgtZmDdERZEDgKiAfP2SDfxz2oKuzjuJK2B9",
+				"/ip4/47.111.131.2/tcp/3001/ipfs/1kHCcTMZ8EjRm23nffDsYEEARohWwF4ks6zdsaBs3JbzKnA",
+				"/ip4/47.88.217.237/tcp/3001/ipfs/1kHVYJ6tckDB5gChvDFo46esBWzz6aWsMaEXfxJPNwruHWZ",
+				"/ip4/47.91.19.11/tcp/3001/ipfs/1kHBa9E1onVKmruWvefJHSNFGokkNc3ESZebnq2oJFRDFDG",
+
+				"/ip4/47.254.20.76/tcp/3001/ipfs/1kHKUGfEQ4nzpWG4SkQAUPicrKHCVo32WTgNEQbM75rNEbx",
+				"/ip4/47.93.191.135/tcp/3001/ipfs/1kHVzyb8mczCYNB3suPCXac7HMPEc4XyvibHE2hQsh8ehEk",
+				"/ip4/101.132.191.42/tcp/3001/ipfs/1kHCoMGo8ANpjFNMyYFZLTHruBJ5DrAXYVBvfQP2CZWKf6h",
+				"/ip4/39.104.62.26/tcp/3001/ipfs/1kHHvSatMYVHDdDFNmMyta8tNY4c4VvtifkBAxfjNG7wSpU",
+			},
 		},
+	}
+
+	MainnetChainWitnesses = []common.Address{
+		common.HexToAddress("0x91837ff26639700c9688cf8f3fe92bd8b2ec806d"),
+		common.HexToAddress("0x3c60a032ba3c6177e50188748e55e5894fb241e4"),
+		common.HexToAddress("0xaa2b5f39fb2a4aee56db3ee19567f699d30df1a1"),
+		common.HexToAddress("0x61a6e04c737483d72c20de6e71dd8cbb6f6c747d"),
+		common.HexToAddress("0x186bae02dc3444d2bb3d39504fefdc9754860481"),
+
+		common.HexToAddress("0xf4c8fd44490493000b8776fd1597752bd9ede431"),
+		common.HexToAddress("0x4e94885ed5cfe31a00c7496176f59fdc5e5c7a71"),
+		common.HexToAddress("0x4b47c3262a9d2c309b692c9220898ff728054c00"),
+		common.HexToAddress("0x31ba9c8cf34d7cc0957a95744b245322af427786"),
+		common.HexToAddress("0x4dcfcd45b253119c0d3db6b9ba9e154167dd6a58"),
+
+		common.HexToAddress("0xe6c745142283dbbe4b4a03e969525e25031939fa"),
+		common.HexToAddress("0xc61a92dd1713f9ba2214f0ce92e3d408ba4d426d"),
+		common.HexToAddress("0xc221a4d0b30dee366bc7899dd29e0f7ac9a7e45a"),
+		common.HexToAddress("0xddfd32c4d33915685b926ba5eaab3860db1690cd"),
+		common.HexToAddress("0xd338d81c4723982c815a294de3b38608dad9962c"),
+
+		common.HexToAddress("0x6cd54fc6da0f044c43d4550d87ae10b9e1cea351"),
+		common.HexToAddress("0xd328d8864649ed050b3d8e9d77f94c75299fd243"),
+		common.HexToAddress("0x386dd85ad17b6bd60d2d142473b54bf9d5439842"),
+		common.HexToAddress("0x4b8a6cff7b9e008caa936aadd33d9be048623d53"),
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the Ropsten test network.
 	TestnetChainConfig = &ChainConfig{
-		ChainID:             big.NewInt(3),
-		HomesteadBlock:      big.NewInt(0),
-		DAOForkBlock:        nil,
-		DAOForkSupport:      true,
-		EIP150Block:         big.NewInt(0),
-		EIP150Hash:          common.HexToHash("0x41941023680923e0fe4d74a34bdac8141f2540e3ae90623718e47d66d1ca4a2d"),
-		EIP155Block:         big.NewInt(10),
-		EIP158Block:         big.NewInt(10),
-		ByzantiumBlock:      big.NewInt(1700000),
-		ConstantinopleBlock: nil,
+		ChainID: big.NewInt(3),
 		Dpos: &DposConfig{
+			Period:       2,
+			WitnessesNum: 19,
+		},
+	}
+
+	// AllCliqueProtocolChanges contains every protocol change (EIPs) introduced
+	// and accepted by the hubble core developers into the Clique consensus.
+	//
+	// This configuration is intentionally not using keyed fields to force anyone
+	// adding flags to the config to also have to set these fields.
+	AllCliqueProtocolChanges = &ChainConfig{
+		big.NewInt(1337),
+		big.NewInt(0),
+		&DposConfig{
 			Period:       2,
 			WitnessesNum: 4,
 		},
 	}
 
-	// RinkebyChainConfig contains the chain parameters to run a node on the Rinkeby test network.
-	RinkebyChainConfig = &ChainConfig{
-		ChainID:             big.NewInt(4),
-		HomesteadBlock:      big.NewInt(1),
-		DAOForkBlock:        nil,
-		DAOForkSupport:      true,
-		EIP150Block:         big.NewInt(2),
-		EIP150Hash:          common.HexToHash("0x9b095b36c15eaf13044373aef8ee0bd3a382a5abb92e402afa44b8249c3a90e9"),
-		EIP155Block:         big.NewInt(3),
-		EIP158Block:         big.NewInt(3),
-		ByzantiumBlock:      big.NewInt(1035301),
-		ConstantinopleBlock: nil,
-	}
-
-	TestChainConfig = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil}
-	TestRules       = TestChainConfig.Rules(new(big.Int))
+	TestChainConfig = &ChainConfig{
+		big.NewInt(1),
+		big.NewInt(0),
+		&DposConfig{
+			Period:       2,
+			WitnessesNum: 4,
+		}}
+	TestRules = TestChainConfig.Rules(new(big.Int))
 )
 
 // ChainConfig is the core config which determines the blockchain settings.
@@ -94,20 +128,7 @@ var (
 type ChainConfig struct {
 	ChainID *big.Int `json:"chainId"` // chainId identifies the current chain and is used for replay protection
 
-	HomesteadBlock *big.Int `json:"homesteadBlock,omitempty"` // Homestead switch block (nil = no fork, 0 = already homestead)
-
-	DAOForkBlock   *big.Int `json:"daoForkBlock,omitempty"`   // TheDAO hard-fork switch block (nil = no fork)
-	DAOForkSupport bool     `json:"daoForkSupport,omitempty"` // Whether the nodes supports or opposes the DAO hard-fork
-
-	// EIP150 implements the Gas price changes (https://github.com/ethereum/EIPs/issues/150)
-	EIP150Block *big.Int    `json:"eip150Block,omitempty"` // EIP150 HF block (nil = no fork)
-	EIP150Hash  common.Hash `json:"eip150Hash,omitempty"`  // EIP150 HF hash (needed for header only clients as only gas pricing changed)
-
-	EIP155Block *big.Int `json:"eip155Block,omitempty"` // EIP155 HF block
-	EIP158Block *big.Int `json:"eip158Block,omitempty"` // EIP158 HF block
-
-	ByzantiumBlock      *big.Int `json:"byzantiumBlock,omitempty"`      // Byzantium switch block (nil = no fork, 0 = already on byzantium)
-	ConstantinopleBlock *big.Int `json:"constantinopleBlock,omitempty"` // Constantinople switch block (nil = no fork, 0 = already activated)
+	HubbleBlock *big.Int `json:"HubbleBlock,omitempty"` // Hubble switch block (nil = no fork, 0 = already hubble)
 
 	// Various consensus engines
 	Dpos *DposConfig `json:"dpos,omitempty"`
@@ -133,69 +154,29 @@ func (c *ChainConfig) String() string {
 	default:
 		engine = "unknown"
 	}
-	return fmt.Sprintf("{ChainID: %v Homestead: %v DAO: %v DAOSupport: %v EIP150: %v EIP155: %v EIP158: %v Byzantium: %v Constantinople: %v Engine: %v}",
+
+	return fmt.Sprintf("{ChainID: %v Hubble: %v Engine: %v}",
 		c.ChainID,
-		c.HomesteadBlock,
-		c.DAOForkBlock,
-		c.DAOForkSupport,
-		c.EIP150Block,
-		c.EIP155Block,
-		c.EIP158Block,
-		c.ByzantiumBlock,
-		c.ConstantinopleBlock,
+		c.HubbleBlock,
 		engine,
 	)
 }
 
-// IsHomestead returns whether num is either equal to the homestead block or greater.
-func (c *ChainConfig) IsHomestead(num *big.Int) bool {
-	return isForked(c.HomesteadBlock, num)
+// IsHubble returns whether num is either equal to the hubble block or greater.
+func (c *ChainConfig) IsHubble(num *big.Int) bool {
+	return isForked(c.HubbleBlock, num)
 }
 
-// IsDAOFork returns whether num is either equal to the DAO fork block or greater.
-func (c *ChainConfig) IsDAOFork(num *big.Int) bool {
-	return isForked(c.DAOForkBlock, num)
-}
-
-// IsEIP150 returns whether num is either equal to the EIP150 fork block or greater.
-func (c *ChainConfig) IsEIP150(num *big.Int) bool {
-	return isForked(c.EIP150Block, num)
-}
-
-// IsEIP155 returns whether num is either equal to the EIP155 fork block or greater.
-func (c *ChainConfig) IsEIP155(num *big.Int) bool {
-	return isForked(c.EIP155Block, num)
-}
-
-// IsEIP158 returns whether num is either equal to the EIP158 fork block or greater.
-func (c *ChainConfig) IsEIP158(num *big.Int) bool {
-	return isForked(c.EIP158Block, num)
-}
-
-// IsByzantium returns whether num is either equal to the Byzantium fork block or greater.
-func (c *ChainConfig) IsByzantium(num *big.Int) bool {
-	return isForked(c.ByzantiumBlock, num)
-}
-
-// IsConstantinople returns whether num is either equal to the Constantinople fork block or greater.
-func (c *ChainConfig) IsConstantinople(num *big.Int) bool {
-	return isForked(c.ConstantinopleBlock, num)
-}
-
-// GasTable returns the gas table corresponding to the current phase (homestead or homestead reprice).
+// GasTable returns the gas table corresponding to the current phase .
 //
 // The returned GasTable's fields shouldn't, under any circumstances, be changed.
 func (c *ChainConfig) GasTable(num *big.Int) GasTable {
 	if num == nil {
-		return GasTableHomestead
+		return GasTableHubble
 	}
 	switch {
-	case c.IsEIP158(num):
-		return GasTableEIP158
-	case c.IsEIP150(num):
-		return GasTableEIP150
 	default:
-		return GasTableHomestead
+		return GasTableHubble
 	}
 }
 
@@ -218,32 +199,8 @@ func (c *ChainConfig) CheckCompatible(newcfg *ChainConfig, height uint64) *Confi
 }
 
 func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, head *big.Int) *ConfigCompatError {
-	if isForkIncompatible(c.HomesteadBlock, newcfg.HomesteadBlock, head) {
-		return newCompatError("Homestead fork block", c.HomesteadBlock, newcfg.HomesteadBlock)
-	}
-	if isForkIncompatible(c.DAOForkBlock, newcfg.DAOForkBlock, head) {
-		return newCompatError("DAO fork block", c.DAOForkBlock, newcfg.DAOForkBlock)
-	}
-	if c.IsDAOFork(head) && c.DAOForkSupport != newcfg.DAOForkSupport {
-		return newCompatError("DAO fork support flag", c.DAOForkBlock, newcfg.DAOForkBlock)
-	}
-	if isForkIncompatible(c.EIP150Block, newcfg.EIP150Block, head) {
-		return newCompatError("EIP150 fork block", c.EIP150Block, newcfg.EIP150Block)
-	}
-	if isForkIncompatible(c.EIP155Block, newcfg.EIP155Block, head) {
-		return newCompatError("EIP155 fork block", c.EIP155Block, newcfg.EIP155Block)
-	}
-	if isForkIncompatible(c.EIP158Block, newcfg.EIP158Block, head) {
-		return newCompatError("EIP158 fork block", c.EIP158Block, newcfg.EIP158Block)
-	}
-	if c.IsEIP158(head) && !configNumEqual(c.ChainID, newcfg.ChainID) {
-		return newCompatError("EIP158 chain ID", c.EIP158Block, newcfg.EIP158Block)
-	}
-	if isForkIncompatible(c.ByzantiumBlock, newcfg.ByzantiumBlock, head) {
-		return newCompatError("Byzantium fork block", c.ByzantiumBlock, newcfg.ByzantiumBlock)
-	}
-	if isForkIncompatible(c.ConstantinopleBlock, newcfg.ConstantinopleBlock, head) {
-		return newCompatError("Constantinople fork block", c.ConstantinopleBlock, newcfg.ConstantinopleBlock)
+	if isForkIncompatible(c.HubbleBlock, newcfg.HubbleBlock, head) {
+		return newCompatError("Hubble fork block", c.HubbleBlock, newcfg.HubbleBlock)
 	}
 	return nil
 }
@@ -309,9 +266,8 @@ func (err *ConfigCompatError) Error() string {
 // Rules is a one time interface meaning that it shouldn't be used in between transition
 // phases.
 type Rules struct {
-	ChainID                                   *big.Int
-	IsHomestead, IsEIP150, IsEIP155, IsEIP158 bool
-	IsByzantium                               bool
+	ChainID  *big.Int
+	IsHubble bool
 }
 
 // Rules ensures c's ChainID is not nil.
@@ -320,5 +276,5 @@ func (c *ChainConfig) Rules(num *big.Int) Rules {
 	if chainID == nil {
 		chainID = new(big.Int)
 	}
-	return Rules{ChainID: new(big.Int).Set(chainID), IsHomestead: c.IsHomestead(num), IsEIP150: c.IsEIP150(num), IsEIP155: c.IsEIP155(num), IsEIP158: c.IsEIP158(num), IsByzantium: c.IsByzantium(num)}
+	return Rules{ChainID: new(big.Int).Set(chainID), IsHubble: c.IsHubble(num)}
 }

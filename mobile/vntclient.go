@@ -25,12 +25,12 @@ import (
 	"github.com/vntchain/go-vnt/vntclient"
 )
 
-// EthereumClient provides access to the VNT APIs.
+// VNTClient provides access to the VNT APIs.
 type VNTClient struct {
 	client *vntclient.Client
 }
 
-// NewEthereumClient connects a client to the given URL.
+// NewVNTClient connects a client to the given URL.
 func NewVNTClient(rawurl string) (client *VNTClient, _ error) {
 	rawClient, err := vntclient.Dial(rawurl)
 	return &VNTClient{rawClient}, err
@@ -269,7 +269,7 @@ func (ec *VNTClient) GetPendingTransactionCount(ctx *Context) (count int, _ erro
 // Contract Calling
 
 // CallContract executes a message call transaction, which is directly executed in the VM
-// of the node, but never mined into the blockchain.
+// of the node, but never produced into the blockchain.
 //
 // blockNumber selects the block height at which the call runs. It can be <0, in which
 // case the code is taken from the latest known block. Note that state from very old
@@ -281,7 +281,7 @@ func (ec *VNTClient) CallContract(ctx *Context, msg *CallMsg, number int64) (out
 	return ec.client.CallContract(ctx.context, msg.msg, big.NewInt(number))
 }
 
-// PendingCallContract executes a message call transaction using the EVM.
+// PendingCallContract executes a message call transaction using the VM.
 // The state seen by the contract call is the pending state.
 func (ec *VNTClient) PendingCallContract(ctx *Context, msg *CallMsg) (output []byte, _ error) {
 	return ec.client.PendingCallContract(ctx.context, msg.msg)
@@ -296,7 +296,7 @@ func (ec *VNTClient) SuggestGasPrice(ctx *Context) (price *BigInt, _ error) {
 
 // EstimateGas tries to estimate the gas needed to execute a specific transaction based on
 // the current pending state of the backend blockchain. There is no guarantee that this is
-// the true gas limit requirement as other transactions may be added or removed by miners,
+// the true gas limit requirement as other transactions may be added or removed by producers,
 // but it should provide a basis for setting a reasonable default.
 func (ec *VNTClient) EstimateGas(ctx *Context, msg *CallMsg) (gas int64, _ error) {
 	rawGas, err := ec.client.EstimateGas(ctx.context, msg.msg)
@@ -306,7 +306,7 @@ func (ec *VNTClient) EstimateGas(ctx *Context, msg *CallMsg) (gas int64, _ error
 // SendTransaction injects a signed transaction into the pending pool for execution.
 //
 // If the transaction was a contract creation use the TransactionReceipt method to get the
-// contract address after the transaction has been mined.
+// contract address after the transaction has been produced.
 func (ec *VNTClient) SendTransaction(ctx *Context, tx *Transaction) error {
 	return ec.client.SendTransaction(ctx.context, tx.tx)
 }

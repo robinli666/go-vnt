@@ -1,3 +1,19 @@
+// Copyright 2019 The go-vnt Authors
+// This file is part of the go-vnt library.
+//
+// The go-vnt library is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// The go-vnt library is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU Lesser General Public License for more details.
+//
+// You should have received a copy of the GNU Lesser General Public License
+// along with the go-vnt library. If not, see <http://www.gnu.org/licenses/>.
+
 package wavm
 
 import (
@@ -9,28 +25,27 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/vntchain/go-vnt/accounts/abi"
 	"github.com/vntchain/go-vnt/common"
 	"github.com/vntchain/go-vnt/core/state"
 	"github.com/vntchain/go-vnt/core/vm"
 	"github.com/vntchain/go-vnt/core/wavm/contract"
-	"github.com/vntchain/vnt-wasm/exec"
 	g "github.com/vntchain/go-vnt/core/wavm/gas"
-	"github.com/vntchain/vnt-wasm/validate"
-	"github.com/vntchain/vnt-wasm/wasm"
-	"github.com/vntchain/go-vnt/vntdb"
 	"github.com/vntchain/go-vnt/log"
 	"github.com/vntchain/go-vnt/params"
 	"github.com/vntchain/go-vnt/trie"
-	"github.com/stretchr/testify/assert"
+	"github.com/vntchain/go-vnt/vntdb"
+	"github.com/vntchain/vnt-wasm/exec"
+	"github.com/vntchain/vnt-wasm/validate"
+	"github.com/vntchain/vnt-wasm/wasm"
 )
 
-var debugCodePath = filepath.Join("testdata/debug", "program.wasm")
-var debugAbiPath = filepath.Join("testdata/debug", "abi.json")
+var debugCodePath = filepath.Join("tests/debug", "program.wasm")
+var debugAbiPath = filepath.Join("tests/debug", "abi.json")
 
-var eventCodePath = filepath.Join("testdata/event", "program.wasm")
-var eventAbiPath = filepath.Join("testdata/event", "abi.json")
-
+var eventCodePath = filepath.Join("tests/event", "program.wasm")
+var eventAbiPath = filepath.Join("tests/event", "abi.json")
 
 var logMsg = ""
 var logCtx []interface{} = nil
@@ -99,7 +114,6 @@ func readAbi(abiPath string) abi.ABI {
 }
 
 func importer(name string) (*wasm.Module, error) {
-	fmt.Println("111", name)
 	f, err := os.Open(name + ".wasm")
 	if err != nil {
 		return nil, err
@@ -123,7 +137,7 @@ func getVM(codeFile string, abiPath string) (*exec.Interpreter, EnvFunctions) {
 	abi := readAbi(abiPath)
 	addr := common.BytesToAddress([]byte("0xd2be7e0d40c1a73ec1709f00b11cb5e24c784077"))
 
-	chainconfig := &params.ChainConfig{HomesteadBlock: big.NewInt(1150000)}
+	chainconfig := &params.ChainConfig{HubbleBlock: big.NewInt(0)}
 	gasRule := g.NewGas(false)
 	gasTable := chainconfig.GasTable(new(big.Int).SetInt64(10000))
 	contract := contract.NewWASMContract(vm.AccountRef(addr),
@@ -136,10 +150,9 @@ func getVM(codeFile string, abiPath string) (*exec.Interpreter, EnvFunctions) {
 		GasRule:     gasRule,
 		GasCounter:  gasCounter,
 		GasLimit:    10000000,
-		Wavm: &WAVM {
-			Wavm: &Wavm{
-
-			},
+		Wavm: &WAVM{
+			wavmConfig: Config{Debug: true, Tracer: NewWasmLogger(nil)},
+			Wavm:       &Wavm{},
 		},
 	}
 
@@ -163,7 +176,7 @@ func getVM(codeFile string, abiPath string) (*exec.Interpreter, EnvFunctions) {
 	//compiled, err := CompileModule(m, cc)
 	//compiled := make([]vnt.Compiled, 0)
 
-	vm, err := exec.NewInterpreter(m, nil, instantiateMemory)
+	vm, err := exec.NewInterpreter(m, nil, instantiateMemory, cc.Wavm.Wavm.captureOp, cc.Wavm.Wavm.captureEnvFunctionStart, cc.Wavm.Wavm.captureEnvFunctionEnd, false)
 	if err != nil {
 		log.Crit("failed to create vm: ", "error", err)
 	}
@@ -183,13 +196,10 @@ func handlePanic(t *testing.T, msg string) {
 func TestVM_PrintAddress(t *testing.T) {
 	log.Root().SetHandler(logHandler)
 	defer clearLog()
-
 	vm, ef := getVM(debugCodePath, debugAbiPath)
-
 	ef.ctx.Wavm.Wavm.SetFuncName("init")
 
 	var mutable = true
-
 	proc := exec.NewWavmProcess(vm.VM, vm.Memory, &mutable)
 
 	fmt.Println("testing...")
@@ -336,7 +346,7 @@ func TestVM_getPrintRemark(t *testing.T) {
 
 	remarkIdx := uint64(vm.Memory.SetBytes([]byte("The value is: ")))
 
-	remark := ef.GetPrintRemark(proc, remarkIdx)
+	remark := ef.getPrintRemark(proc, remarkIdx)
 
 	assert.Equal(t, "The value is: ", remark)
 }

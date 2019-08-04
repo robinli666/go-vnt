@@ -17,8 +17,8 @@
 // Package chequebook package wraps the 'chequebook' VNT smart contract.
 //
 // The functions in this package allow using chequebook for
-// issuing, receiving, verifying cheques in ether; (auto)cashing cheques in ether
-// as well as (auto)depositing ether to the chequebook contract.
+// issuing, receiving, verifying cheques in vnt; (auto)cashing cheques in vnt
+// as well as (auto)depositing vnt to the chequebook contract.
 package chequebook
 
 //go:generate abigen --sol contract/chequebook.sol --exc contract/mortal.sol:mortal,contract/owned.sol:owned --pkg contract --out contract/chequebook.go
@@ -52,8 +52,8 @@ import (
 // Some functionality requires interacting with the blockchain:
 // * setting current balance on peer's chequebook
 // * sending the transaction to cash the cheque
-// * depositing ether to the chequebook
-// * watching incoming ether
+// * depositing vnt to the chequebook
+// * watching incoming vnt
 
 var (
 	gasToCash = uint64(2000000) // gas cost of a cash transaction using chequebook
@@ -88,6 +88,7 @@ var ContractParams = &Params{contract.ChequebookBin, contract.ChequebookABI}
 // Chequebook can create and sign cheques from a single contract to multiple beneficiaries.
 // It is the outgoing payment handler for peer to peer micropayments.
 type Chequebook struct {
+	chainID  *big.Int
 	path     string                      // path to chequebook file
 	prvKey   *ecdsa.PrivateKey           // private key to sign cheque with
 	lock     sync.Mutex                  //
@@ -114,7 +115,7 @@ func (self *Chequebook) String() string {
 }
 
 // NewChequebook creates a new Chequebook.
-func NewChequebook(path string, contractAddr common.Address, prvKey *ecdsa.PrivateKey, backend Backend) (self *Chequebook, err error) {
+func NewChequebook(chainID *big.Int, path string, contractAddr common.Address, prvKey *ecdsa.PrivateKey, backend Backend) (self *Chequebook, err error) {
 	balance := new(big.Int)
 	sent := make(map[common.Address]*big.Int)
 
@@ -122,13 +123,14 @@ func NewChequebook(path string, contractAddr common.Address, prvKey *ecdsa.Priva
 	if err != nil {
 		return nil, err
 	}
-	transactOpts := bind.NewKeyedTransactor(prvKey)
+	transactOpts := bind.NewKeyedTransactor(prvKey, chainID)
 	session := &contract.ChequebookSession{
 		Contract:     chbook,
 		TransactOpts: *transactOpts,
 	}
 
 	self = &Chequebook{
+		chainID:      chainID,
 		prvKey:       prvKey,
 		balance:      balance,
 		contractAddr: contractAddr,
@@ -158,13 +160,13 @@ func (self *Chequebook) setBalanceFromBlockChain() {
 }
 
 // LoadChequebook loads a chequebook from disk (file path).
-func LoadChequebook(path string, prvKey *ecdsa.PrivateKey, backend Backend, checkBalance bool) (self *Chequebook, err error) {
+func LoadChequebook(chainID *big.Int, path string, prvKey *ecdsa.PrivateKey, backend Backend, checkBalance bool) (self *Chequebook, err error) {
 	var data []byte
 	data, err = ioutil.ReadFile(path)
 	if err != nil {
 		return
 	}
-	self, _ = NewChequebook(path, common.Address{}, prvKey, backend)
+	self, _ = NewChequebook(chainID, path, common.Address{}, prvKey, backend)
 
 	err = json.Unmarshal(data, self)
 	if err != nil {
@@ -297,14 +299,9 @@ func (self *Chequebook) Cash(ch *Cheque) (txhash string, err error) {
 
 // data to sign: contract address, beneficiary, cumulative amount of funds ever sent
 func sigHash(contract, beneficiary common.Address, sum *big.Int) []byte {
-	bigamount := sum.Bytes()
-	if len(bigamount) > 32 {
-		return nil
-	}
-	var amount32 [32]byte
-	copy(amount32[32-len(bigamount):32], bigamount)
+	bigamount := []byte(sum.String())
 	input := append(contract.Bytes(), beneficiary.Bytes()...)
-	input = append(input, amount32[:]...)
+	input = append(input, bigamount[:]...)
 	return crypto.Keccak256(input)
 }
 
@@ -336,7 +333,7 @@ func (self *Chequebook) Deposit(amount *big.Int) (string, error) {
 // The caller must hold self.lock.
 func (self *Chequebook) deposit(amount *big.Int) (string, error) {
 	// since the amount is variable here, we do not use sessions
-	depositTransactor := bind.NewKeyedTransactor(self.prvKey)
+	depositTransactor := bind.NewKeyedTransactor(self.prvKey, self.chainID)
 	depositTransactor.Value = amount
 	chbookRaw := &contract.ChequebookRaw{Contract: self.contract}
 	tx, err := chbookRaw.Transfer(depositTransactor)
@@ -429,6 +426,7 @@ func (self *Outbox) String() string {
 // Inbox can deposit, verify and cash cheques from a single contract to a single
 // beneficiary. It is the incoming payment handler for peer to peer micropayments.
 type Inbox struct {
+	chainID     *big.Int
 	lock        sync.Mutex
 	contract    common.Address              // peer's chequebook contract
 	beneficiary common.Address              // local peer's receiving address
@@ -445,7 +443,7 @@ type Inbox struct {
 
 // NewInbox creates an Inbox. An Inboxes is not persisted, the cumulative sum is updated
 // from blockchain when first cheque is received.
-func NewInbox(prvKey *ecdsa.PrivateKey, contractAddr, beneficiary common.Address, signer *ecdsa.PublicKey, abigen bind.ContractBackend) (self *Inbox, err error) {
+func NewInbox(chainID *big.Int, prvKey *ecdsa.PrivateKey, contractAddr, beneficiary common.Address, signer *ecdsa.PublicKey, abigen bind.ContractBackend) (self *Inbox, err error) {
 	if signer == nil {
 		return nil, fmt.Errorf("signer is null")
 	}
@@ -453,7 +451,7 @@ func NewInbox(prvKey *ecdsa.PrivateKey, contractAddr, beneficiary common.Address
 	if err != nil {
 		return nil, err
 	}
-	transactOpts := bind.NewKeyedTransactor(prvKey)
+	transactOpts := bind.NewKeyedTransactor(prvKey, chainID)
 	transactOpts.GasLimit = gasToCash
 	session := &contract.ChequebookSession{
 		Contract:     chbook,
@@ -462,6 +460,7 @@ func NewInbox(prvKey *ecdsa.PrivateKey, contractAddr, beneficiary common.Address
 	sender := transactOpts.From
 
 	self = &Inbox{
+		chainID:     chainID,
 		contract:    contractAddr,
 		beneficiary: beneficiary,
 		sender:      sender,
@@ -613,8 +612,8 @@ func (self *Cheque) Verify(signerKey *ecdsa.PublicKey, contract, beneficiary com
 }
 
 // v/r/s representation of signature
-func sig2vrs(sig []byte) (v byte, r, s [32]byte) {
-	v = sig[64] + 27
+func sig2vrs(sig []byte) (v []byte, r, s [32]byte) {
+	v = []byte{sig[64] + 27}
 	copy(r[:], sig[:32])
 	copy(s[:], sig[32:64])
 	return
@@ -623,7 +622,7 @@ func sig2vrs(sig []byte) (v byte, r, s [32]byte) {
 // Cash cashes the cheque by sending an VNT transaction.
 func (self *Cheque) Cash(session *contract.ChequebookSession) (string, error) {
 	v, r, s := sig2vrs(self.Sig)
-	tx, err := session.Cash(self.Beneficiary, self.Amount, v, r, s)
+	tx, err := session.Cash(self.Beneficiary, self.Amount, common.Bytes2Hex(v), common.Bytes2Hex(r[:]), common.Bytes2Hex(s[:]))
 	if err != nil {
 		return "", err
 	}

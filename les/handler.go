@@ -128,8 +128,8 @@ type ProtocolManager struct {
 	wg *sync.WaitGroup
 }
 
-// NewProtocolManager returns a new ethereum sub protocol manager. The VNT sub protocol manages peers capable
-// with the ethereum network.
+// NewProtocolManager returns a new hubble sub protocol manager. The VNT sub protocol manages peers capable
+// with the hubble network.
 func NewProtocolManager(chainConfig *params.ChainConfig, lightSync bool, protocolVersions []uint, networkId uint64, mux *event.TypeMux, engine consensus.Engine, peers *peerSet, blockchain BlockChain, txpool txPool, chainDb vntdb.Database, odr *LesOdr, txrelay *LesTxRelay, serverPool *serverPool, quitSync chan struct{}, wg *sync.WaitGroup) (*ProtocolManager, error) {
 	// Create the protocol manager with the base fields
 	manager := &ProtocolManager{
@@ -369,7 +369,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		return errResp(ErrMsgTooLarge, "%v > %v", size, ProtocolMaxMsgSize)
 	}
 
-	// yhx -- 按理说，新版的协议处理方式，不会有残留数据得不到处理
+	//-- 按理说，新版的协议处理方式，不会有残留数据得不到处理
 	//defer msg.Discard()
 
 	var deliverMsg *Msg
@@ -1191,7 +1191,7 @@ func (pm *ProtocolManager) txStatus(hashes []common.Hash) []txStatus {
 // NodeInfo represents a short summary of the VNT sub-protocol metadata
 // known about the host peer.
 type NodeInfo struct {
-	Network    uint64              `json:"network"`    // VNT network ID (1=Frontier, 2=Morden, Ropsten=3, Rinkeby=4)
+	Network    uint64              `json:"network"`    // VNT network ID (1=Frontier)
 	Difficulty *big.Int            `json:"difficulty"` // Total difficulty of the host's blockchain
 	Genesis    common.Hash         `json:"genesis"`    // SHA3 hash of the host's genesis block
 	Config     *params.ChainConfig `json:"config"`     // Chain configuration for the fork rules

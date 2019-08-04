@@ -26,6 +26,7 @@ import (
 	libp2p "github.com/libp2p/go-libp2p-peer"
 	"github.com/vntchain/go-vnt/common"
 	"github.com/vntchain/go-vnt/core/types"
+	"github.com/vntchain/go-vnt/log"
 	"github.com/vntchain/go-vnt/rlp"
 	"github.com/vntchain/go-vnt/vntp2p"
 	set "gopkg.in/fatih/set.v0"
@@ -84,8 +85,7 @@ type peer struct {
 	*vntp2p.Peer
 	rw vntp2p.MsgReadWriter
 
-	version  int         // Protocol version negotiated
-	forkDrop *time.Timer // Timed connection dropper if forks aren't validated in time
+	version int // Protocol version negotiated
 
 	head common.Hash
 	td   *big.Int
@@ -134,7 +134,7 @@ func (p *peer) broadcast() {
 			if err := p.SendNewBlockHashes(newBlockHashesData{data}); err != nil {
 				return
 			}
-			p.Log().Trace("Announced block", "number", anno.block.Number(), "hash", anno.block.Hash(), "peer", p.id)
+			p.Log().Trace("Announced block", "number", anno.block.Number(), "hash", anno.block.Hash().String(), "peer", p.id)
 
 		case <-p.term:
 			return
@@ -331,6 +331,7 @@ func (p *peer) Handshake(network uint64, td *big.Int, head common.Hash, genesis 
 	var status statusData // safe to read after two values have been received from errc
 
 	go func() {
+		log.Info("vnt protocol handshake", "going to send handshake msg to", p.id, "ProtocolVersion", uint32(p.version))
 		errc <- vntp2p.Send(p.rw, ProtocolName, StatusMsg, &statusData{
 			ProtocolVersion: uint32(p.version),
 			NetworkId:       network,
@@ -339,9 +340,11 @@ func (p *peer) Handshake(network uint64, td *big.Int, head common.Hash, genesis 
 			GenesisBlock:    genesis,
 		})
 	}()
+
 	go func() {
 		errc <- p.readStatus(network, &status, genesis)
 	}()
+
 	timeout := time.NewTimer(handshakeTimeout)
 	defer timeout.Stop()
 	for i := 0; i < 2; i++ {
@@ -374,13 +377,18 @@ func (p *peer) readStatus(network uint64, status *statusData, genesis common.Has
 	if err := msg.Decode(&status); err != nil {
 		return errResp(ErrDecode, "msg %v: %v", msg, err)
 	}
+
 	if status.GenesisBlock != genesis {
+		// this peer is mismatch with local node, drop it
+		p.Peer.Drop()
 		return errResp(ErrGenesisBlockMismatch, "%x (!= %x)", status.GenesisBlock[:8], genesis[:8])
 	}
 	if status.NetworkId != network {
+		p.Peer.Drop()
 		return errResp(ErrNetworkIdMismatch, "%d (!= %d)", status.NetworkId, network)
 	}
 	if int(status.ProtocolVersion) != p.version {
+		p.Peer.Drop()
 		return errResp(ErrProtocolVersionMismatch, "%d (!= %d)", status.ProtocolVersion, p.version)
 	}
 	return nil
